@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Firm {
+  id            String   @id @default(cuid())
+  name          String
+  practiceFocus String
+  users         User[]
+  clients       Client[]
+  cases         Case[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model User {
+  id            String         @id @default(cuid())
+  firmId        String
+  firm          Firm           @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  name          String
+  email         String
+  role          String
+  assignedCases Case[]
+  internalNotes InternalNote[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([firmId, email])
+  @@index([firmId])
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  firmId    String
+  firm      Firm     @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  phone     String
+  cases     Case[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([firmId, email])
+  @@index([firmId, updatedAt])
+}
+
+model Case {
+  id                  String            @id @default(cuid())
+  firmId              String
+  firm                Firm              @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  clientId            String
+  client              Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignedUserId      String?
+  assignedUser        User?             @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  caseNumber          String
+  caseType            CaseType
+  description         String
+  status              CaseStatus
+  urgencyLevel        UrgencyLevel
+  paymentStatus       PaymentStatus
+  intakeCompleted     Boolean           @default(false)
+  priorityScore       Int               @default(30)
+  internalIntakeNotes String?
+  documentRequests    DocumentRequest[]
+  followUpTasks       FollowUpTask[]
+  aiSummary           AISummary?
+  internalNotes       InternalNote[]
+  activityLogs        ActivityLog[]
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([firmId, status])
+  @@index([firmId, urgencyLevel])
+  @@unique([firmId, caseNumber])
+  @@index([clientId, updatedAt])
+}
+
+model DocumentRequest {
+  id          String         @id @default(cuid())
+  caseId      String
+  case        Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      DocumentStatus
+  dueDate     DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([caseId, status])
+}
+
+model FollowUpTask {
+  id        String         @id @default(cuid())
+  caseId    String
+  case      Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title     String
+  type      FollowUpType
+  dueDate   DateTime
+  status    FollowUpStatus
+  priority  UrgencyLevel
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([caseId, status])
+  @@index([type, status])
+}
+
+model AISummary {
+  id                   String       @id @default(cuid())
+  caseId               String       @unique
+  case                 Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  situationSummary     String
+  keyRisks             String[]
+  missingInformation   String[]
+  recommendedNextSteps String[]
+  priorityLevel        UrgencyLevel
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+}
+
+model InternalNote {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseId, createdAt])
+}
+
+model ActivityLog {
+  id        String       @id @default(cuid())
+  caseId    String
+  case      Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type      ActivityType
+  message   String
+  createdAt DateTime     @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+enum CaseStatus {
+  NEW_INTAKE
+  INTAKE_INCOMPLETE
+  WAITING_ON_DOCUMENTS
+  PAYMENT_PENDING
+  READY_FOR_ATTORNEY_REVIEW
+  IN_REVIEW
+  CLOSED
+}
+
+enum CaseType {
+  IMMIGRATION
+  BANKRUPTCY
+  PERSONAL_INJURY
+  FAMILY_LAW
+  ESTATE_PLANNING
+  CONTRACT_REVIEW
+}
+
+enum DocumentStatus {
+  REQUESTED
+  RECEIVED
+  MISSING
+  WAIVED
+}
+
+enum FollowUpStatus {
+  OPEN
+  COMPLETED
+  CANCELED
+}
+
+enum FollowUpType {
+  QUESTIONNAIRE
+  DOCUMENT_REMINDER
+  PAYMENT
+  ATTORNEY_REVIEW
+  GENERAL
+}
+
+enum PaymentStatus {
+  NOT_REQUIRED
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum UrgencyLevel {
+  LOW
+  STANDARD
+  HIGH
+  CRITICAL
+}
+
+enum ActivityType {
+  INTAKE_CREATED
+  DOCUMENT_REQUESTED
+  DOCUMENT_RECEIVED
+  FOLLOW_UP_CREATED
+  FOLLOW_UP_COMPLETED
+  SUMMARY_GENERATED
+  NOTE_ADDED
+  PAYMENT_UPDATED
+  STATUS_CHANGED
+}

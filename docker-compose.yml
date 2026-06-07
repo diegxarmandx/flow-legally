@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: legalflow-ai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: legalflow
+      POSTGRES_PASSWORD: legalflow
+      POSTGRES_DB: legalflow_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - legalflow-postgres:/var/lib/postgresql/data
+
+volumes:
+  legalflow-postgres:
