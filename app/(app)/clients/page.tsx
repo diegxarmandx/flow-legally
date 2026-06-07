@@ -1,4 +1,4 @@
-import { Search, Users } from "lucide-react";
+import { ArrowUpRight, Search, Users } from "lucide-react";
 import Link from "next/link";
 import { getClients } from "@/lib/repositories/legalflow-repository";
 import { ButtonLink } from "@/components/ui/button";
@@ -73,21 +73,24 @@ export default async function ClientsPage({
                         <div className="flex h-9 w-9 items-center justify-center rounded-md bg-ink text-xs font-bold text-paper">
                           {initials(client.name)}
                         </div>
-                        <div>
-                          <Link
-                            className="focus-ring rounded-sm font-semibold text-ink hover:text-brief"
-                            href={`/clients/${client.id}`}
-                          >
-                            {client.name}
-                          </Link>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              className="focus-ring rounded-sm font-semibold text-ink hover:text-brief"
+                              href={`/clients/${client.id}`}
+                            >
+                              {client.name}
+                            </Link>
                           {client.cases[0] ? (
                             <Link
-                              className="focus-ring rounded-sm text-xs font-semibold text-brief hover:text-pine"
+                              className="focus-ring inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-ledger bg-bone/70 px-3 py-1.5 text-xs font-semibold text-brief shadow-hairline transition hover:border-walnut/45 hover:bg-white hover:text-pine"
                               href={`/cases/${client.cases[0].id}`}
                             >
-                              Open latest case
+                              Open latest
+                              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                             </Link>
                           ) : null}
+                          </div>
                         </div>
                       </div>
                     </td>
