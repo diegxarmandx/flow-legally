@@ -74,7 +74,12 @@ export default async function ClientsPage({
                           {initials(client.name)}
                         </div>
                         <div>
-                          <p className="font-semibold text-ink">{client.name}</p>
+                          <Link
+                            className="focus-ring rounded-sm font-semibold text-ink hover:text-brief"
+                            href={`/clients/${client.id}`}
+                          >
+                            {client.name}
+                          </Link>
                           {client.cases[0] ? (
                             <Link
                               className="focus-ring rounded-sm text-xs font-semibold text-brief hover:text-pine"

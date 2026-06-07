@@ -37,13 +37,22 @@ function FieldError({ errors }: { errors?: string[] }) {
   );
 }
 
-export function IntakeForm() {
+type IntakePrefill = {
+  clientId?: string;
+  clientName?: string;
+  email?: string;
+  phone?: string;
+};
+
+export function IntakeForm({ prefill }: { prefill?: IntakePrefill }) {
   const [state, formAction] = useActionState(createIntakeAction, initialState);
   const [caseType, setCaseType] = useState<CaseType>(CaseType.IMMIGRATION);
   const documents = useMemo(() => documentChecklistByCaseType[caseType], [caseType]);
 
   return (
     <form action={formAction} className="space-y-6">
+      {prefill?.clientId ? <input type="hidden" name="clientId" value={prefill.clientId} /> : null}
+
       {state.status === "error" ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           {state.message}
@@ -62,6 +71,7 @@ export function IntakeForm() {
               id="clientName"
               name="clientName"
               autoComplete="name"
+              defaultValue={prefill?.clientName}
               required
             />
             <FieldError errors={state.fieldErrors?.clientName} />
@@ -76,6 +86,7 @@ export function IntakeForm() {
               name="email"
               type="email"
               autoComplete="email"
+              defaultValue={prefill?.email}
               required
             />
             <FieldError errors={state.fieldErrors?.email} />
@@ -89,6 +100,7 @@ export function IntakeForm() {
               id="phone"
               name="phone"
               autoComplete="tel"
+              defaultValue={prefill?.phone}
               required
             />
             <FieldError errors={state.fieldErrors?.phone} />
@@ -209,7 +221,7 @@ export function IntakeForm() {
       <div className="flex flex-col items-start justify-between gap-3 rounded-lg border border-ledger bg-white/75 p-4 shadow-hairline sm:flex-row sm:items-center">
         <p className="max-w-2xl text-sm leading-6 text-docket">
           Submitting creates or connects the client, opens the case, requests documents, generates
-          follow-ups, creates a mock AI summary, logs activity, and redirects to the case workspace.
+          follow-ups, creates a case summary, logs activity, and redirects to the case workspace.
         </p>
         <SubmitButton />
       </div>

@@ -8,7 +8,7 @@ import {
   PaymentStatus,
   UrgencyLevel,
   type ActivityLog,
-  type AISummary,
+  type Summary,
   type Client,
   type DocumentRequest,
   type Firm,
@@ -18,7 +18,7 @@ import {
   type User
 } from "@/types/legalflow";
 import { calculatePriorityScore } from "@/lib/services/case-status";
-import { generateAISummary } from "@/lib/services/ai-summary";
+import { generateSummary } from "@/lib/services/summary";
 
 export type LegalFlowState = {
   firm: Firm;
@@ -27,7 +27,7 @@ export type LegalFlowState = {
   cases: LegalCase[];
   documentRequests: DocumentRequest[];
   followUpTasks: FollowUpTask[];
-  aiSummaries: AISummary[];
+  summaries: Summary[];
   internalNotes: InternalNote[];
   activityLogs: ActivityLog[];
 };
@@ -94,8 +94,8 @@ function task(
   };
 }
 
-function summary(id: string, caseRecord: LegalCase, missingDocuments: string[]): AISummary {
-  const draft = generateAISummary({
+function summary(id: string, caseRecord: LegalCase, missingDocuments: string[]): Summary {
+  const draft = generateSummary({
     caseType: caseRecord.caseType,
     caseDescription: caseRecord.description,
     urgencyLevel: caseRecord.urgencyLevel,
@@ -354,7 +354,7 @@ export function createDemoState(): LegalFlowState {
     task("task_008", "case_010", "Follow up on overdue planning fee", FollowUpType.PAYMENT, 1, FollowUpStatus.OPEN, UrgencyLevel.STANDARD)
   ];
 
-  const aiSummaries = cases
+  const summaries = cases
     .filter((caseRecord) => caseRecord.id !== "case_007")
     .map((caseRecord, index) =>
       summary(
@@ -395,7 +395,7 @@ export function createDemoState(): LegalFlowState {
 
   const activityLogs = cases.flatMap((caseRecord, index) => [
     activity(`log_${index + 1}_a`, caseRecord.id, ActivityType.INTAKE_CREATED, `Intake created for ${caseRecord.caseNumber}.`, caseRecord.createdAt === caseRecord.updatedAt ? 3 : 8),
-    activity(`log_${index + 1}_b`, caseRecord.id, ActivityType.SUMMARY_GENERATED, `AI case summary generated for ${caseRecord.caseNumber}.`, 2),
+    activity(`log_${index + 1}_b`, caseRecord.id, ActivityType.SUMMARY_GENERATED, `Case summary generated for ${caseRecord.caseNumber}.`, 2),
     activity(`log_${index + 1}_c`, caseRecord.id, ActivityType.STATUS_CHANGED, `Case status changed to ${caseRecord.status.replaceAll("_", " ").toLowerCase()}.`, 1)
   ]);
 
@@ -406,7 +406,7 @@ export function createDemoState(): LegalFlowState {
     cases,
     documentRequests,
     followUpTasks,
-    aiSummaries,
+    summaries,
     internalNotes,
     activityLogs
   };

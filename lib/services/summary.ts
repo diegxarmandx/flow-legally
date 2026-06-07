@@ -1,11 +1,14 @@
 import {
   CaseType,
   PaymentStatus,
+  SummarySource,
   UrgencyLevel,
-  type AISummaryDraft,
-  type AISummaryInput
+  type SummaryDraft,
+  type SummaryInput
 } from "@/types/legalflow";
 import { labelFor } from "@/lib/utils/format";
+
+export const SUMMARY_RULESET_VERSION = "rules-v1";
 
 const caseSpecificRisk: Record<CaseType, string> = {
   [CaseType.IMMIGRATION]: "Immigration timelines and documentation gaps may affect filing readiness.",
@@ -16,7 +19,7 @@ const caseSpecificRisk: Record<CaseType, string> = {
   [CaseType.CONTRACT_REVIEW]: "Business deadlines and unclear contract terms may require fast attorney review."
 };
 
-export function generateAISummary(input: AISummaryInput): AISummaryDraft {
+export function generateSummary(input: SummaryInput): SummaryDraft {
   const missingInformation =
     input.missingDocuments.length > 0
       ? input.missingDocuments
@@ -33,6 +36,8 @@ export function generateAISummary(input: AISummaryInput): AISummaryDraft {
       : "No emergency timing issue is apparent from the intake.";
 
   return {
+    source: SummarySource.RULE_BASED,
+    version: SUMMARY_RULESET_VERSION,
     situationSummary: `${labelFor(input.caseType)} intake describing ${input.caseDescription.trim()} The matter is currently tagged ${labelFor(input.urgencyLevel).toLowerCase()} priority with ${labelFor(input.paymentStatus).toLowerCase()} payment status.`,
     keyRisks: [caseSpecificRisk[input.caseType], paymentRisk, urgencyRisk],
     missingInformation,

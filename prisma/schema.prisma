@@ -68,15 +68,16 @@ model Case {
   internalIntakeNotes String?
   documentRequests    DocumentRequest[]
   followUpTasks       FollowUpTask[]
-  aiSummary           AISummary?
+  summary             Summary?
   internalNotes       InternalNote[]
   activityLogs        ActivityLog[]
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
+  @@unique([firmId, caseNumber])
   @@index([firmId, status])
   @@index([firmId, urgencyLevel])
-  @@unique([firmId, caseNumber])
+  @@index([firmId, updatedAt])
   @@index([clientId, updatedAt])
 }
 
@@ -107,20 +108,27 @@ model FollowUpTask {
   updatedAt DateTime       @updatedAt
 
   @@index([caseId, status])
+  @@index([caseId, type, status])
+  @@index([caseId, dueDate])
   @@index([type, status])
 }
 
-model AISummary {
-  id                   String       @id @default(cuid())
-  caseId               String       @unique
-  case                 Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+model Summary {
+  id                   String        @id @default(cuid())
+  caseId               String        @unique
+  case                 Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  source               SummarySource @default(RULE_BASED)
+  version              String        @default("rules-v1")
   situationSummary     String
   keyRisks             String[]
   missingInformation   String[]
   recommendedNextSteps String[]
   priorityLevel        UrgencyLevel
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([source, updatedAt])
+  @@index([priorityLevel])
 }
 
 model InternalNote {
@@ -204,6 +212,7 @@ enum UrgencyLevel {
 
 enum ActivityType {
   INTAKE_CREATED
+  INTAKE_COMPLETED
   DOCUMENT_REQUESTED
   DOCUMENT_RECEIVED
   FOLLOW_UP_CREATED
@@ -211,5 +220,11 @@ enum ActivityType {
   SUMMARY_GENERATED
   NOTE_ADDED
   PAYMENT_UPDATED
+  ATTORNEY_REVIEW_STARTED
   STATUS_CHANGED
+}
+
+enum SummarySource {
+  RULE_BASED
+  PROVIDER
 }

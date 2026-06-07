@@ -1,4 +1,4 @@
-import { Bot, Database, GitBranch, ListChecks, ShieldCheck, Workflow } from "lucide-react";
+import { Database, GitBranch, ListChecks, ScrollText, ShieldCheck, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -7,7 +7,7 @@ const sections = [
   {
     title: "Why this app exists",
     icon: Workflow,
-    body: "LegalFlow AI demonstrates the kind of service-business automation Glade.ai is building: not a generic chatbot, but a workflow product that moves client matters from intake to attorney readiness."
+    body: "FlowLegally demonstrates the kind of service-business automation Glade.ai is building: not a generic chatbot, but a workflow product that moves client matters from intake to attorney readiness."
   },
   {
     title: "Product problem",
@@ -22,12 +22,12 @@ const sections = [
   {
     title: "Database model",
     icon: Database,
-    body: "The Prisma schema models firm-scoped users, clients, cases, document requests, follow-up tasks, AI summaries, notes, and activity logs with enums for operational state and indexes for dashboard queries."
+    body: "The Prisma schema models firm-scoped users, clients, cases, document requests, follow-up tasks, case summaries, notes, and activity logs with enums for operational state and indexes for dashboard queries."
   },
   {
-    title: "AI summary design",
-    icon: Bot,
-    body: "The mock AI service returns structured legal intake summaries with situation, risks, missing information, recommended next steps, and priority. It is intentionally provider-ready but requires no API key."
+    title: "Case summary design",
+    icon: ScrollText,
+    body: "The summary service returns structured legal intake summaries with situation, risks, missing information, recommended next steps, and priority. It is intentionally provider-ready but requires no API key."
   },
   {
     title: "Risk and quality bar",
@@ -40,7 +40,7 @@ const edgeCases = [
   "Empty client list and case list states",
   "Invalid intake input with useful validation messages",
   "Duplicate active follow-up prevention",
-  "Cases with no AI summary",
+  "Cases with no case summary",
   "All documents complete and payment clear",
   "Payment pending after document readiness",
   "High urgency triage",
@@ -75,8 +75,8 @@ export default function EngineeringPage() {
               value="The demo uses one seeded firm to keep focus on workflow depth. Real production would add firm membership, RBAC, and audit controls."
             />
             <Tradeoff
-              label="Mock AI provider"
-              value="The AI service is structured for replacement with a real provider, but deterministic output keeps the demo easy to evaluate."
+              label="Summary provider"
+              value="The summary service is structured for replacement with a real provider later, but deterministic output keeps the demo easy to evaluate today."
             />
             <Tradeoff
               label="Stored case status"
@@ -108,7 +108,7 @@ export default function EngineeringPage() {
           follow-up operations: ingest structured intake, identify missing work, generate useful
           summaries, create follow-ups, and expose bottlenecks before staff has to hunt for them.
           Production evolution would add integrations, secure client messaging, file upload,
-          provider-backed AI, firm-level permissions, analytics, and observability.
+          provider-backed summary automation, firm-level permissions, analytics, and observability.
         </p>
       </Card>
     </div>

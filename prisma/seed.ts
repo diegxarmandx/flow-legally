@@ -8,7 +8,7 @@ async function main() {
 
   await prisma.activityLog.deleteMany();
   await prisma.internalNote.deleteMany();
-  await prisma.aISummary.deleteMany();
+  await prisma.summary.deleteMany();
   await prisma.followUpTask.deleteMany();
   await prisma.documentRequest.deleteMany();
   await prisma.case.deleteMany();
@@ -97,10 +97,12 @@ async function main() {
     }))
   });
 
-  await prisma.aISummary.createMany({
-    data: state.aiSummaries.map((summary) => ({
+  await prisma.summary.createMany({
+    data: state.summaries.map((summary) => ({
       id: summary.id,
       caseId: summary.caseId,
+      source: summary.source,
+      version: summary.version,
       situationSummary: summary.situationSummary,
       keyRisks: summary.keyRisks,
       missingInformation: summary.missingInformation,
@@ -132,7 +134,7 @@ async function main() {
     }))
   });
 
-  console.log("Seeded LegalFlow AI demo data.");
+  console.log("Seeded FlowLegally demo data.");
 }
 
 main()

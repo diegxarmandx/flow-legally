@@ -105,4 +105,18 @@ describe("follow-up automation", () => {
       FollowUpType.PAYMENT
     ]);
   });
+
+  it("keeps payment follow-ups open while payment is still blocking", () => {
+    const resolved = findResolvedFollowUps({
+      caseRecord: {
+        ...caseRecord,
+        intakeCompleted: true,
+        paymentStatus: PaymentStatus.PARTIAL
+      },
+      documentRequests: [{ ...missingDocument, status: DocumentStatus.RECEIVED }],
+      existingTasks: [activeTask(FollowUpType.PAYMENT)]
+    });
+
+    expect(resolved).toEqual([]);
+  });
 });

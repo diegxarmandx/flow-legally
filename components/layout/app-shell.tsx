@@ -1,21 +1,18 @@
 import {
-  BarChart3,
   BriefcaseBusiness,
-  ClipboardList,
   FileText,
-  GitBranch,
-  Home,
-  Users
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { NavLink, type NavIconName } from "@/components/layout/nav-link";
 
-const navItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/intake/new", label: "New Intake", icon: ClipboardList },
-  { href: "/engineering", label: "Engineering", icon: GitBranch }
+const navItems: { href: string; label: string; icon: NavIconName }[] = [
+  { href: "/", label: "Home", icon: "home" },
+  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { href: "/clients", label: "Clients", icon: "clients" },
+  { href: "/review", label: "Review", icon: "review" },
+  { href: "/intake/new", label: "New Intake", icon: "intake" },
+  { href: "/engineering", label: "Engineering", icon: "engineering" }
 ];
 
 function isDemoMode() {
@@ -35,7 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div>
               <Link className="focus-ring rounded-sm legal-heading text-lg font-semibold" href="/">
-                LegalFlow AI
+                FlowLegally
               </Link>
               <p className="text-xs text-paper/68">Operations cockpit</p>
             </div>
@@ -44,7 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {demoMode ? (
             <div
               className="mt-4 rounded-md border border-amber-200/35 bg-amber-200/12 px-3 py-2"
-              title="DATABASE_URL is not configured, so LegalFlow AI is using seeded fallback data."
+              title="DATABASE_URL is not configured, so FlowLegally is using seeded fallback data."
             >
               <p className="text-xs font-bold uppercase text-amber-100">Demo Mode</p>
               <p className="mt-1 text-xs leading-5 text-paper/64">
@@ -56,14 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="flex gap-1 overflow-x-auto px-3 pb-4 lg:block lg:space-y-1 lg:overflow-visible lg:px-4">
           {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="focus-ring flex min-h-11 shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-paper/76 transition hover:bg-paper/12 hover:text-paper lg:w-full"
-            >
-              <item.icon className="h-4 w-4" aria-hidden="true" />
-              {item.label}
-            </Link>
+            <NavLink key={item.href} {...item} />
           ))}
         </nav>
 

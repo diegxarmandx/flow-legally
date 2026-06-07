@@ -139,8 +139,8 @@ export default async function DashboardPage() {
           <Card className="bg-ink text-paper">
             <p className="text-sm font-semibold">Glade.ai fit</p>
             <p className="mt-3 text-sm leading-6 text-paper/72">
-              This demo treats AI as workflow automation: summaries, readiness signals, and follow-up
-              work that helps a service business move cases forward.
+              This demo treats case summaries, readiness signals, and follow-up work as operational
+              automation that helps a service business move cases forward.
             </p>
           </Card>
         </div>

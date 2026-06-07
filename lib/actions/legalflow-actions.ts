@@ -6,10 +6,15 @@ import {
   completeFollowUpTask,
   createFollowUpTask,
   createIntake,
+  markCaseReadyForReview,
   markDocumentReceived,
-  regenerateSummary
+  markIntakeComplete,
+  regenerateSummary,
+  startAttorneyReview,
+  updatePaymentStatus
 } from "@/lib/repositories/legalflow-repository";
 import {
+  caseUpdateSchema,
   documentUpdateSchema,
   followUpTaskSchema,
   intakeSchema,
@@ -28,6 +33,7 @@ export async function createIntakeAction(
   formData: FormData
 ): Promise<IntakeActionState> {
   const raw = {
+    clientId: String(formData.get("clientId") ?? "") || undefined,
     clientName: String(formData.get("clientName") ?? ""),
     email: String(formData.get("email") ?? ""),
     phone: String(formData.get("phone") ?? ""),
@@ -60,6 +66,24 @@ export async function markDocumentReceivedAction(formData: FormData) {
 
   if (parsed.success) {
     await markDocumentReceived(parsed.data.documentId);
+  }
+}
+
+export async function markIntakeCompleteAction(formData: FormData) {
+  const caseId = String(formData.get("caseId") ?? "");
+  if (caseId) {
+    await markIntakeComplete(caseId);
+  }
+}
+
+export async function updatePaymentStatusAction(formData: FormData) {
+  const parsed = caseUpdateSchema.safeParse({
+    paymentStatus: String(formData.get("paymentStatus") ?? "")
+  });
+  const caseId = String(formData.get("caseId") ?? "");
+
+  if (caseId && parsed.success && parsed.data.paymentStatus) {
+    await updatePaymentStatus({ caseId, paymentStatus: parsed.data.paymentStatus });
   }
 }
 
@@ -100,5 +124,19 @@ export async function regenerateSummaryAction(formData: FormData) {
   const caseId = String(formData.get("caseId") ?? "");
   if (caseId) {
     await regenerateSummary(caseId);
+  }
+}
+
+export async function markCaseReadyForReviewAction(formData: FormData) {
+  const caseId = String(formData.get("caseId") ?? "");
+  if (caseId) {
+    await markCaseReadyForReview(caseId);
+  }
+}
+
+export async function startAttorneyReviewAction(formData: FormData) {
+  const caseId = String(formData.get("caseId") ?? "");
+  if (caseId) {
+    await startAttorneyReview(caseId);
   }
 }

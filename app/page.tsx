@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, ClipboardList, FileText, Scale, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardList, FileText, Scale, ScrollText, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button";
 
@@ -6,7 +6,7 @@ export default function HomePage() {
   const proofPoints = [
     { label: "Active matters", value: "10+", detail: "Seeded cases across intake, documents, and review" },
     { label: "Review states", value: "7", detail: "Operational statuses for real firm workflows" },
-    { label: "Setup friction", value: "0", detail: "Demo mode runs without PostgreSQL" }
+    { label: "Review handoff", value: "1 view", detail: "Intake, documents, payment, and case notes organized for attorney review" }
   ];
 
   const capabilities = [
@@ -21,9 +21,9 @@ export default function HomePage() {
       icon: FileText
     },
     {
-      title: "AI without theater",
-      body: "Structured mock summaries support attorney review without adding a chatbot between staff and their work.",
-      icon: Sparkles
+      title: "Attorney-ready summaries",
+      body: "Structured case summaries support attorney review without adding another tool between staff and their work.",
+      icon: ScrollText
     }
   ];
 
@@ -36,7 +36,7 @@ export default function HomePage() {
               <Scale className="h-5 w-5" aria-hidden="true" />
             </span>
             <span>
-              <span className="legal-heading block text-lg font-semibold">LegalFlow AI</span>
+              <span className="legal-heading block text-lg font-semibold">FlowLegally</span>
               <span className="block text-xs text-paper/68">Legal operations automation</span>
             </span>
           </Link>
@@ -56,11 +56,11 @@ export default function HomePage() {
               Built for service-business automation
             </p>
             <h1 className="legal-heading text-5xl font-semibold leading-[1.02] text-paper md:text-7xl">
-              LegalFlow AI
+              FlowLegally
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-paper/82 md:text-xl">
               A polished SaaS cockpit for legal intake, case readiness, document follow-up,
-              payment blockers, and mock-AI attorney summaries.
+              payment blockers, and attorney-ready case summaries.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <ButtonLink href="/dashboard" className="bg-brief text-white hover:bg-pine">

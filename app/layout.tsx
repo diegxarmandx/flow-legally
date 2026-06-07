@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LegalFlow AI",
+  title: "FlowLegally",
   description: "Legal intake and follow-up automation dashboard for law firms."
 };
 

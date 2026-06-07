@@ -52,6 +52,7 @@ export const clientSchema = z.object({
 });
 
 export const intakeSchema = z.object({
+  clientId: z.string().trim().min(1).optional(),
   clientName: requiredText("Client name is required.", 120),
   email: z.string().trim().toLowerCase().email("Enter a valid email address."),
   phone: phoneSchema,

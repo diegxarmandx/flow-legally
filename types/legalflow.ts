@@ -62,6 +62,7 @@ export type UrgencyLevel = (typeof UrgencyLevel)[keyof typeof UrgencyLevel];
 
 export const ActivityType = {
   INTAKE_CREATED: "INTAKE_CREATED",
+  INTAKE_COMPLETED: "INTAKE_COMPLETED",
   DOCUMENT_REQUESTED: "DOCUMENT_REQUESTED",
   DOCUMENT_RECEIVED: "DOCUMENT_RECEIVED",
   FOLLOW_UP_CREATED: "FOLLOW_UP_CREATED",
@@ -69,9 +70,16 @@ export const ActivityType = {
   SUMMARY_GENERATED: "SUMMARY_GENERATED",
   NOTE_ADDED: "NOTE_ADDED",
   PAYMENT_UPDATED: "PAYMENT_UPDATED",
+  ATTORNEY_REVIEW_STARTED: "ATTORNEY_REVIEW_STARTED",
   STATUS_CHANGED: "STATUS_CHANGED"
 } as const;
 export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
+
+export const SummarySource = {
+  RULE_BASED: "RULE_BASED",
+  PROVIDER: "PROVIDER"
+} as const;
+export type SummarySource = (typeof SummarySource)[keyof typeof SummarySource];
 
 export type ISODate = string;
 
@@ -144,9 +152,11 @@ export type FollowUpTask = {
   updatedAt: ISODate;
 };
 
-export type AISummary = {
+export type Summary = {
   id: string;
   caseId: string;
+  source: SummarySource;
+  version: string;
   situationSummary: string;
   keyRisks: string[];
   missingInformation: string[];
@@ -178,7 +188,7 @@ export type CaseRecord = LegalCase & {
   assignedUser?: User | null;
   documentRequests: DocumentRequest[];
   followUpTasks: FollowUpTask[];
-  aiSummary?: AISummary | null;
+  summary?: Summary | null;
   internalNotes: (InternalNote & { author?: User | null })[];
   activityLogs: ActivityLog[];
 };
@@ -218,7 +228,26 @@ export type DashboardData = {
   mode: "postgres" | "demo";
 };
 
+export type ReviewQueueGroup = "ready" | "inReview" | "blocked";
+
+export type ReviewQueueRow = RecentCaseRow & {
+  clientId: string;
+  caseNumber: string;
+  blockers: string[];
+  nextAction: string;
+  readinessPercent: number;
+  updatedAt: ISODate;
+  group: ReviewQueueGroup;
+};
+
+export type ReviewQueueData = {
+  ready: ReviewQueueRow[];
+  inReview: ReviewQueueRow[];
+  blocked: ReviewQueueRow[];
+};
+
 export type IntakeInput = {
+  clientId?: string;
   clientName: string;
   email: string;
   phone: string;
@@ -243,7 +272,7 @@ export type AutomationTaskDraft = {
   priority: UrgencyLevel;
 };
 
-export type AISummaryInput = {
+export type SummaryInput = {
   caseType: CaseType;
   caseDescription: string;
   urgencyLevel: UrgencyLevel;
@@ -252,4 +281,4 @@ export type AISummaryInput = {
   intakeNotes?: string | null;
 };
 
-export type AISummaryDraft = Omit<AISummary, "id" | "caseId" | "createdAt" | "updatedAt">;
+export type SummaryDraft = Omit<Summary, "id" | "caseId" | "createdAt" | "updatedAt">;

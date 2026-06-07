@@ -2,21 +2,24 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { activityMessage } from "@/lib/services/activity-log";
-import { generateAISummary } from "@/lib/services/ai-summary";
+import { generateSummary } from "@/lib/services/summary";
+import { buildAttorneyReviewStart } from "@/lib/services/attorney-review";
 import { calculateCaseStatus, calculatePriorityScore } from "@/lib/services/case-status";
 import { findResolvedFollowUps, generateFollowUpTasks } from "@/lib/services/follow-up-automation";
+import { buildReviewReadiness, canSetReadyForAttorneyReview } from "@/lib/services/review-readiness";
 import { createDemoState, type LegalFlowState } from "@/lib/data/demo-data";
 import {
   ActivityType,
-  type AISummaryDraft,
+  type SummaryDraft,
   type AutomationTaskDraft,
   CaseStatus,
   DocumentStatus,
   FollowUpStatus,
   FollowUpType,
+  PaymentStatus,
   UrgencyLevel,
   type ActivityLog,
-  type AISummary,
+  type Summary,
   type CaseRecord,
   type Client,
   type ClientRecord,
@@ -28,37 +31,37 @@ import {
   type InternalNote,
   type LegalCase,
   type RecentCaseRow,
+  type ReviewQueueData,
+  type ReviewQueueGroup,
+  type ReviewQueueRow,
   type User
 } from "@/types/legalflow";
 import { labelFor } from "@/lib/utils/format";
 import { isActiveCase, isPaymentBlocking, missingDocuments, priorityLabel } from "@/lib/utils/status";
 
+const caseInclude = {
+  client: true,
+  assignedUser: true,
+  documentRequests: true,
+  followUpTasks: true,
+  summary: true,
+  internalNotes: { include: { author: true } },
+  activityLogs: true
+} satisfies Prisma.CaseInclude;
+
+const clientCaseInclude = {
+  cases: {
+    include: caseInclude,
+    orderBy: { updatedAt: "desc" }
+  }
+} satisfies Prisma.ClientInclude;
+
 type CaseWithRelations = Prisma.CaseGetPayload<{
-  include: {
-    client: true;
-    assignedUser: true;
-    documentRequests: true;
-    followUpTasks: true;
-    aiSummary: true;
-    internalNotes: { include: { author: true } };
-    activityLogs: true;
-  };
+  include: typeof caseInclude;
 }>;
 
 type ClientWithCases = Prisma.ClientGetPayload<{
-  include: {
-    cases: {
-      include: {
-        client: true;
-        assignedUser: true;
-        documentRequests: true;
-        followUpTasks: true;
-        aiSummary: true;
-        internalNotes: { include: { author: true } };
-        activityLogs: true;
-      };
-    };
-  };
+  include: typeof clientCaseInclude;
 }>;
 
 type DemoGlobal = typeof globalThis & {
@@ -115,6 +118,10 @@ function dueDateFromInput(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
 function buildDocumentDrafts(requiredDocuments: string[]): DocumentDraft[] {
   return requiredDocuments.map((title) => ({
     title,
@@ -142,8 +149,8 @@ function buildCaseReadiness(caseRecord: LegalCase, documentRequests: DocumentReq
   };
 }
 
-function buildIntakeSummary(input: IntakeInput, documentRequests: Pick<DocumentRequest, "title">[]): AISummaryDraft {
-  return generateAISummary({
+function buildIntakeSummary(input: IntakeInput, documentRequests: Pick<DocumentRequest, "title">[]): SummaryDraft {
+  return generateSummary({
     caseType: input.caseType,
     caseDescription: input.description,
     urgencyLevel: input.urgencyLevel,
@@ -274,11 +281,13 @@ function mapTask(task: Prisma.FollowUpTaskGetPayload<object>): FollowUpTask {
   };
 }
 
-function mapSummary(summary: Prisma.AISummaryGetPayload<object> | null): AISummary | null {
+function mapSummary(summary: Prisma.SummaryGetPayload<object> | null): Summary | null {
   if (!summary) return null;
   return {
     id: summary.id,
     caseId: summary.caseId,
+    source: summary.source,
+    version: summary.version,
     situationSummary: summary.situationSummary,
     keyRisks: summary.keyRisks,
     missingInformation: summary.missingInformation,
@@ -318,7 +327,7 @@ function composePrismaCase(caseRecord: CaseWithRelations): CaseRecord {
     assignedUser: caseRecord.assignedUser ? mapUser(caseRecord.assignedUser) : null,
     documentRequests: caseRecord.documentRequests.map(mapDocument),
     followUpTasks: caseRecord.followUpTasks.map(mapTask),
-    aiSummary: mapSummary(caseRecord.aiSummary),
+    summary: mapSummary(caseRecord.summary),
     internalNotes: caseRecord.internalNotes.map(mapNote).sort(sortNewestFirst),
     activityLogs: caseRecord.activityLogs.map(mapActivity).sort(sortNewestFirst)
   };
@@ -342,7 +351,7 @@ function composeDemoCase(state: LegalFlowState, caseRecord: LegalCase): CaseReco
     assignedUser: state.users.find((item) => item.id === caseRecord.assignedUserId) ?? null,
     documentRequests: state.documentRequests.filter((item) => item.caseId === caseRecord.id),
     followUpTasks: state.followUpTasks.filter((item) => item.caseId === caseRecord.id),
-    aiSummary: state.aiSummaries.find((item) => item.caseId === caseRecord.id) ?? null,
+    summary: state.summaries.find((item) => item.caseId === caseRecord.id) ?? null,
     internalNotes: state.internalNotes
       .filter((item) => item.caseId === caseRecord.id)
       .map((note) => ({
@@ -397,6 +406,43 @@ function dashboardFromCases(firm: Firm, cases: CaseRecord[], mode: DashboardData
   };
 }
 
+function reviewQueueRow(caseRecord: CaseRecord, group: ReviewQueueGroup): ReviewQueueRow {
+  const readiness = buildReviewReadiness(caseRecord);
+  return {
+    ...recentRow(caseRecord),
+    clientId: caseRecord.clientId,
+    caseNumber: caseRecord.caseNumber,
+    blockers: readiness.blockers,
+    nextAction: readiness.nextAction,
+    readinessPercent: readiness.readinessPercent,
+    updatedAt: caseRecord.updatedAt,
+    group
+  };
+}
+
+function reviewQueueFromCases(cases: CaseRecord[]): ReviewQueueData {
+  const activeCases = cases.filter((caseRecord) => isActiveCase(caseRecord.status));
+  const byPriority = (a: ReviewQueueRow, b: ReviewQueueRow) => b.readinessPercent - a.readinessPercent || b.missingDocumentCount - a.missingDocumentCount;
+
+  return {
+    ready: activeCases
+      .filter((caseRecord) => caseRecord.status === CaseStatus.READY_FOR_ATTORNEY_REVIEW)
+      .map((caseRecord) => reviewQueueRow(caseRecord, "ready"))
+      .sort(byPriority),
+    inReview: activeCases
+      .filter((caseRecord) => caseRecord.status === CaseStatus.IN_REVIEW)
+      .map((caseRecord) => reviewQueueRow(caseRecord, "inReview"))
+      .sort(byPriority),
+    blocked: activeCases
+      .filter(
+        (caseRecord) =>
+          caseRecord.status !== CaseStatus.READY_FOR_ATTORNEY_REVIEW && caseRecord.status !== CaseStatus.IN_REVIEW
+      )
+      .map((caseRecord) => reviewQueueRow(caseRecord, "blocked"))
+      .sort(byPriority)
+  };
+}
+
 async function ensurePrismaFirm() {
   const firm = await prisma.firm.upsert({
     where: { id: FIRM_ID },
@@ -441,15 +487,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     const cases = await prisma.case.findMany({
       where: { firmId: firm.id },
       orderBy: { updatedAt: "desc" },
-      include: {
-        client: true,
-        assignedUser: true,
-        documentRequests: true,
-        followUpTasks: true,
-        aiSummary: true,
-        internalNotes: { include: { author: true } },
-        activityLogs: true
-      }
+      include: caseInclude
     });
 
     return dashboardFromCases(mapFirm(firm), cases.map(composePrismaCase), "postgres");
@@ -461,6 +499,22 @@ export async function getDashboardData(): Promise<DashboardData> {
     state.cases.map((caseRecord) => composeDemoCase(state, caseRecord)),
     "demo"
   );
+}
+
+export async function getReviewQueueData(): Promise<ReviewQueueData> {
+  if (shouldUsePrismaStore()) {
+    const firm = await ensurePrismaFirm();
+    const cases = await prisma.case.findMany({
+      where: { firmId: firm.id, status: { not: CaseStatus.CLOSED } },
+      orderBy: [{ priorityScore: "desc" }, { updatedAt: "desc" }],
+      include: caseInclude
+    });
+
+    return reviewQueueFromCases(cases.map(composePrismaCase));
+  }
+
+  const state = demoState();
+  return reviewQueueFromCases(state.cases.map((caseRecord) => composeDemoCase(state, caseRecord)));
 }
 
 export async function getClients(query = ""): Promise<ClientRecord[]> {
@@ -478,20 +532,7 @@ export async function getClients(query = ""): Promise<ClientRecord[]> {
             ]
           : undefined
       },
-      include: {
-        cases: {
-          include: {
-            client: true,
-            assignedUser: true,
-            documentRequests: true,
-            followUpTasks: true,
-            aiSummary: true,
-            internalNotes: { include: { author: true } },
-            activityLogs: true
-          },
-          orderBy: { updatedAt: "desc" }
-        }
-      },
+      include: clientCaseInclude,
       orderBy: { updatedAt: "desc" }
     });
 
@@ -522,6 +563,34 @@ export async function getClients(query = ""): Promise<ClientRecord[]> {
     .sort(sortNewestFirst);
 }
 
+export async function getClientById(clientId: string): Promise<ClientRecord | null> {
+  if (shouldUsePrismaStore()) {
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      include: clientCaseInclude
+    });
+
+    return client ? composeClientRecord(client) : null;
+  }
+
+  const state = demoState();
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) return null;
+
+  const cases = state.cases
+    .filter((caseRecord) => caseRecord.clientId === client.id)
+    .map((caseRecord) => composeDemoCase(state, caseRecord))
+    .sort(sortNewestFirst);
+
+  return {
+    ...client,
+    cases,
+    caseCount: cases.length,
+    lastActivityAt: cases[0]?.updatedAt ?? client.updatedAt,
+    latestCaseStatus: cases[0]?.status ?? null
+  };
+}
+
 function composeClientRecord(client: ClientWithCases): ClientRecord {
   const cases = client.cases.map(composePrismaCase).sort(sortNewestFirst);
   return {
@@ -537,15 +606,7 @@ export async function getCaseById(caseId: string): Promise<CaseRecord | null> {
   if (shouldUsePrismaStore()) {
     const caseRecord = await prisma.case.findUnique({
       where: { id: caseId },
-      include: {
-        client: true,
-        assignedUser: true,
-        documentRequests: true,
-        followUpTasks: true,
-        aiSummary: true,
-        internalNotes: { include: { author: true } },
-        activityLogs: true
-      }
+      include: caseInclude
     });
 
     return caseRecord ? composePrismaCase(caseRecord) : null;
@@ -561,86 +622,110 @@ export async function createIntake(input: IntakeInput): Promise<string> {
 
   if (shouldUsePrismaStore()) {
     const firm = await ensurePrismaFirm();
-    const created = await prisma.$transaction(async (tx) => {
-      const client = await tx.client.upsert({
-        where: { firmId_email: { firmId: firm.id, email: input.email.toLowerCase() } },
-        update: {
-          name: input.clientName,
-          phone: input.phone
-        },
-        create: {
-          firmId: firm.id,
-          name: input.clientName,
-          email: input.email.toLowerCase(),
-          phone: input.phone
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const created = await prisma.$transaction(async (tx) => {
+          const existingClient = input.clientId
+            ? await tx.client.findFirst({ where: { id: input.clientId, firmId: firm.id } })
+            : null;
+          const client = existingClient
+            ? await tx.client.update({
+                where: { id: existingClient.id },
+                data: {
+                  name: input.clientName,
+                  email: input.email.toLowerCase(),
+                  phone: input.phone
+                }
+              })
+            : await tx.client.upsert({
+                where: { firmId_email: { firmId: firm.id, email: input.email.toLowerCase() } },
+                update: {
+                  name: input.clientName,
+                  phone: input.phone
+                },
+                create: {
+                  firmId: firm.id,
+                  name: input.clientName,
+                  email: input.email.toLowerCase(),
+                  phone: input.phone
+                }
+              });
+
+          const count = await tx.case.count({ where: { firmId: firm.id } });
+          const caseNumber = nextCaseNumberFromCount(count + attempt);
+          const priorityScore = calculatePriorityScore({
+            urgencyLevel: input.urgencyLevel,
+            paymentStatus: input.paymentStatus,
+            intakeCompleted: true,
+            missingDocumentCount: documentDrafts.length
+          });
+
+          const caseRecord = await tx.case.create({
+            data: {
+              firmId: firm.id,
+              clientId: client.id,
+              assignedUserId: DEFAULT_USER_ID,
+              caseNumber,
+              caseType: input.caseType,
+              description: input.description,
+              status: CaseStatus.NEW_INTAKE,
+              urgencyLevel: input.urgencyLevel,
+              paymentStatus: input.paymentStatus,
+              intakeCompleted: true,
+              priorityScore,
+              internalIntakeNotes: input.internalIntakeNotes,
+              documentRequests: { create: documentDrafts },
+              activityLogs: {
+                create: activityDraft(ActivityType.INTAKE_CREATED, input.clientName)
+              }
+            },
+            include: { documentRequests: true, followUpTasks: true }
+          });
+
+          const mappedCase = mapCase(caseRecord);
+          const mappedDocuments = caseRecord.documentRequests.map(mapDocument);
+          const readiness = buildCaseReadiness(mappedCase, mappedDocuments);
+          const taskDrafts = buildIntakeTaskDrafts({ ...mappedCase, ...readiness }, mappedDocuments);
+          const summary = buildIntakeSummary(input, mappedDocuments);
+
+          await tx.case.update({
+            where: { id: caseRecord.id },
+            data: {
+              ...readiness,
+              followUpTasks: { create: taskDrafts.map(withOpenStatus) },
+              summary: { create: summary },
+              activityLogs: {
+                create: buildIntakeActivityDrafts({
+                  clientName: input.clientName,
+                  caseNumber: caseRecord.caseNumber,
+                  documentRequests: mappedDocuments,
+                  taskDrafts,
+                  status: readiness.status
+                })
+              }
+            }
+          });
+
+          return caseRecord;
+        });
+
+        revalidateCorePaths(created.id);
+        return created.id;
+      } catch (error) {
+        if (!isUniqueConstraintError(error) || attempt === 2) {
+          throw error;
         }
-      });
+      }
+    }
 
-      const count = await tx.case.count({ where: { firmId: firm.id } });
-      const caseNumber = nextCaseNumberFromCount(count);
-      const priorityScore = calculatePriorityScore({
-        urgencyLevel: input.urgencyLevel,
-        paymentStatus: input.paymentStatus,
-        intakeCompleted: true,
-        missingDocumentCount: documentDrafts.length
-      });
-
-      const caseRecord = await tx.case.create({
-        data: {
-          firmId: firm.id,
-          clientId: client.id,
-          assignedUserId: DEFAULT_USER_ID,
-          caseNumber,
-          caseType: input.caseType,
-          description: input.description,
-          status: CaseStatus.NEW_INTAKE,
-          urgencyLevel: input.urgencyLevel,
-          paymentStatus: input.paymentStatus,
-          intakeCompleted: true,
-          priorityScore,
-          internalIntakeNotes: input.internalIntakeNotes,
-          documentRequests: { create: documentDrafts },
-          activityLogs: {
-            create: activityDraft(ActivityType.INTAKE_CREATED, input.clientName)
-          }
-        },
-        include: { documentRequests: true, followUpTasks: true }
-      });
-
-      const mappedCase = mapCase(caseRecord);
-      const mappedDocuments = caseRecord.documentRequests.map(mapDocument);
-      const readiness = buildCaseReadiness(mappedCase, mappedDocuments);
-      const taskDrafts = buildIntakeTaskDrafts({ ...mappedCase, ...readiness }, mappedDocuments);
-      const summary = buildIntakeSummary(input, mappedDocuments);
-
-      await tx.case.update({
-        where: { id: caseRecord.id },
-        data: {
-          ...readiness,
-          followUpTasks: { create: taskDrafts.map(withOpenStatus) },
-          aiSummary: { create: summary },
-          activityLogs: {
-            create: buildIntakeActivityDrafts({
-              clientName: input.clientName,
-              caseNumber: caseRecord.caseNumber,
-              documentRequests: mappedDocuments,
-              taskDrafts,
-              status: readiness.status
-            })
-          }
-        }
-      });
-
-      return caseRecord;
-    });
-
-    revalidateCorePaths(created.id);
-    return created.id;
+    throw new Error("Unable to create intake after retrying case number allocation.");
   }
 
   const state = demoState();
   const timestamp = now();
-  let client = state.clients.find((item) => item.email.toLowerCase() === input.email.toLowerCase());
+  let client =
+    (input.clientId ? state.clients.find((item) => item.id === input.clientId) : null) ??
+    state.clients.find((item) => item.email.toLowerCase() === input.email.toLowerCase());
 
   if (!client) {
     client = {
@@ -655,6 +740,7 @@ export async function createIntake(input: IntakeInput): Promise<string> {
     state.clients.push(client);
   } else {
     client.name = input.clientName;
+    client.email = input.email.toLowerCase();
     client.phone = input.phone;
     client.updatedAt = timestamp;
   }
@@ -701,7 +787,7 @@ export async function createIntake(input: IntakeInput): Promise<string> {
   state.followUpTasks.push(...tasks);
 
   const summary = buildIntakeSummary(input, documents);
-  state.aiSummaries.push({
+  state.summaries.push({
     id: id("summary"),
     caseId: caseRecord.id,
     ...summary,
@@ -808,22 +894,171 @@ export async function markDocumentReceived(documentId: string) {
   revalidateCorePaths(document.caseId);
 }
 
+export async function markIntakeComplete(caseId: string) {
+  const caseRecord = await getCaseById(caseId);
+  if (!caseRecord || caseRecord.intakeCompleted) return;
+
+  const updatedCase = { ...caseRecord, intakeCompleted: true };
+  const readiness = buildCaseReadiness(updatedCase, caseRecord.documentRequests);
+  const resolvedFollowUps = findResolvedFollowUps({
+    caseRecord: { ...updatedCase, status: readiness.status },
+    documentRequests: caseRecord.documentRequests,
+    existingTasks: caseRecord.followUpTasks
+  });
+
+  if (shouldUsePrismaStore()) {
+    await prisma.$transaction(async (tx) => {
+      if (resolvedFollowUps.length > 0) {
+        await tx.followUpTask.updateMany({
+          where: { id: { in: resolvedFollowUps.map((task) => task.id) } },
+          data: { status: FollowUpStatus.COMPLETED }
+        });
+      }
+
+      await tx.case.update({
+        where: { id: caseId },
+        data: {
+          intakeCompleted: true,
+          ...readiness,
+          activityLogs: {
+            create: [
+              activityDraft(ActivityType.INTAKE_COMPLETED, caseRecord.caseNumber),
+              ...resolvedFollowUps.map((task) => activityDraft(ActivityType.FOLLOW_UP_COMPLETED, task.title)),
+              ...(caseRecord.status !== readiness.status
+                ? [activityDraft(ActivityType.STATUS_CHANGED, labelFor(readiness.status))]
+                : [])
+            ]
+          }
+        }
+      });
+    });
+
+    revalidateCorePaths(caseId);
+    return;
+  }
+
+  const state = demoState();
+  const mutableCase = state.cases.find((item) => item.id === caseId);
+  if (!mutableCase) return;
+  const timestamp = now();
+  mutableCase.intakeCompleted = true;
+  Object.assign(mutableCase, readiness, { updatedAt: timestamp });
+
+  for (const task of state.followUpTasks.filter((item) => resolvedFollowUps.some((resolved) => resolved.id === item.id))) {
+    task.status = FollowUpStatus.COMPLETED;
+    task.updatedAt = timestamp;
+  }
+
+  state.activityLogs.push(
+    demoActivityLog(caseId, activityDraft(ActivityType.INTAKE_COMPLETED, mutableCase.caseNumber), timestamp),
+    ...resolvedFollowUps.map((task) =>
+      demoActivityLog(caseId, activityDraft(ActivityType.FOLLOW_UP_COMPLETED, task.title), timestamp)
+    )
+  );
+
+  if (caseRecord.status !== readiness.status) {
+    state.activityLogs.push(
+      demoActivityLog(caseId, activityDraft(ActivityType.STATUS_CHANGED, labelFor(readiness.status)), timestamp)
+    );
+  }
+
+  revalidateCorePaths(caseId);
+}
+
+export async function updatePaymentStatus(input: { caseId: string; paymentStatus: PaymentStatus }) {
+  const caseRecord = await getCaseById(input.caseId);
+  if (!caseRecord || caseRecord.paymentStatus === input.paymentStatus) return;
+
+  const updatedCase = { ...caseRecord, paymentStatus: input.paymentStatus };
+  const readiness = buildCaseReadiness(updatedCase, caseRecord.documentRequests);
+  const resolvedFollowUps = findResolvedFollowUps({
+    caseRecord: { ...updatedCase, status: readiness.status },
+    documentRequests: caseRecord.documentRequests,
+    existingTasks: caseRecord.followUpTasks
+  });
+
+  if (shouldUsePrismaStore()) {
+    await prisma.$transaction(async (tx) => {
+      if (resolvedFollowUps.length > 0) {
+        await tx.followUpTask.updateMany({
+          where: { id: { in: resolvedFollowUps.map((task) => task.id) } },
+          data: { status: FollowUpStatus.COMPLETED }
+        });
+      }
+
+      await tx.case.update({
+        where: { id: input.caseId },
+        data: {
+          paymentStatus: input.paymentStatus,
+          ...readiness,
+          activityLogs: {
+            create: [
+              activityDraft(ActivityType.PAYMENT_UPDATED, labelFor(input.paymentStatus)),
+              ...resolvedFollowUps.map((task) => activityDraft(ActivityType.FOLLOW_UP_COMPLETED, task.title)),
+              ...(caseRecord.status !== readiness.status
+                ? [activityDraft(ActivityType.STATUS_CHANGED, labelFor(readiness.status))]
+                : [])
+            ]
+          }
+        }
+      });
+    });
+
+    revalidateCorePaths(input.caseId);
+    return;
+  }
+
+  const state = demoState();
+  const mutableCase = state.cases.find((item) => item.id === input.caseId);
+  if (!mutableCase) return;
+  const timestamp = now();
+  mutableCase.paymentStatus = input.paymentStatus;
+  Object.assign(mutableCase, readiness, { updatedAt: timestamp });
+
+  for (const task of state.followUpTasks.filter((item) => resolvedFollowUps.some((resolved) => resolved.id === item.id))) {
+    task.status = FollowUpStatus.COMPLETED;
+    task.updatedAt = timestamp;
+  }
+
+  state.activityLogs.push(
+    demoActivityLog(input.caseId, activityDraft(ActivityType.PAYMENT_UPDATED, labelFor(input.paymentStatus)), timestamp),
+    ...resolvedFollowUps.map((task) =>
+      demoActivityLog(input.caseId, activityDraft(ActivityType.FOLLOW_UP_COMPLETED, task.title), timestamp)
+    )
+  );
+
+  if (caseRecord.status !== readiness.status) {
+    state.activityLogs.push(
+      demoActivityLog(input.caseId, activityDraft(ActivityType.STATUS_CHANGED, labelFor(readiness.status)), timestamp)
+    );
+  }
+
+  revalidateCorePaths(input.caseId);
+}
+
 export async function completeFollowUpTask(taskId: string) {
   if (shouldUsePrismaStore()) {
+    const task = await prisma.followUpTask.findUnique({ where: { id: taskId } });
+    if (!task) return;
+    if (task.type === FollowUpType.QUESTIONNAIRE) {
+      await markIntakeComplete(task.caseId);
+      return;
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
-      const task = await tx.followUpTask.update({
+      const completedTask = await tx.followUpTask.update({
         where: { id: taskId },
         data: { status: FollowUpStatus.COMPLETED }
       });
 
       await tx.activityLog.create({
         data: {
-          caseId: task.caseId,
-          ...activityDraft(ActivityType.FOLLOW_UP_COMPLETED, task.title)
+          caseId: completedTask.caseId,
+          ...activityDraft(ActivityType.FOLLOW_UP_COMPLETED, completedTask.title)
         }
       });
 
-      return task;
+      return completedTask;
     });
 
     revalidateCorePaths(updated.caseId);
@@ -833,6 +1068,10 @@ export async function completeFollowUpTask(taskId: string) {
   const state = demoState();
   const taskItem = state.followUpTasks.find((item) => item.id === taskId);
   if (!taskItem) return;
+  if (taskItem.type === FollowUpType.QUESTIONNAIRE) {
+    await markIntakeComplete(taskItem.caseId);
+    return;
+  }
   const timestamp = now();
   taskItem.status = FollowUpStatus.COMPLETED;
   taskItem.updatedAt = timestamp;
@@ -941,7 +1180,7 @@ export async function regenerateSummary(caseId: string) {
   if (!caseRecord) return;
 
   const missing = missingDocuments(caseRecord.documentRequests).map((document) => document.title);
-  const draft = generateAISummary({
+  const draft = generateSummary({
     caseType: caseRecord.caseType,
     caseDescription: caseRecord.description,
     urgencyLevel: caseRecord.urgencyLevel,
@@ -952,7 +1191,7 @@ export async function regenerateSummary(caseId: string) {
 
   if (shouldUsePrismaStore()) {
     await prisma.$transaction(async (tx) => {
-      await tx.aISummary.upsert({
+      await tx.summary.upsert({
         where: { caseId },
         update: draft,
         create: { caseId, ...draft }
@@ -971,12 +1210,12 @@ export async function regenerateSummary(caseId: string) {
   }
 
   const state = demoState();
-  const existing = state.aiSummaries.find((summary) => summary.caseId === caseId);
+  const existing = state.summaries.find((summary) => summary.caseId === caseId);
   const timestamp = now();
   if (existing) {
     Object.assign(existing, draft, { updatedAt: timestamp });
   } else {
-    state.aiSummaries.push({
+    state.summaries.push({
       id: id("summary"),
       caseId,
       ...draft,
@@ -990,6 +1229,108 @@ export async function regenerateSummary(caseId: string) {
   revalidateCorePaths(caseId);
 }
 
+export async function markCaseReadyForReview(caseId: string) {
+  const caseRecord = await getCaseById(caseId);
+  if (!caseRecord) return;
+
+  const readiness = buildReviewReadiness(caseRecord);
+  if (!canSetReadyForAttorneyReview(caseRecord, readiness)) return;
+
+  if (shouldUsePrismaStore()) {
+    await prisma.$transaction(async (tx) => {
+      await tx.case.update({
+        where: { id: caseId },
+        data: { status: CaseStatus.READY_FOR_ATTORNEY_REVIEW }
+      });
+
+      await tx.activityLog.create({
+        data: {
+          caseId,
+          ...activityDraft(ActivityType.STATUS_CHANGED, labelFor(CaseStatus.READY_FOR_ATTORNEY_REVIEW))
+        }
+      });
+    });
+
+    revalidateCorePaths(caseId);
+    return;
+  }
+
+  const state = demoState();
+  const mutableCase = state.cases.find((item) => item.id === caseId);
+  if (!mutableCase) return;
+  const timestamp = now();
+  mutableCase.status = CaseStatus.READY_FOR_ATTORNEY_REVIEW;
+  mutableCase.updatedAt = timestamp;
+  state.activityLogs.push(
+    demoActivityLog(
+      caseId,
+      activityDraft(ActivityType.STATUS_CHANGED, labelFor(CaseStatus.READY_FOR_ATTORNEY_REVIEW)),
+      timestamp
+    )
+  );
+  revalidateCorePaths(caseId);
+}
+
+export async function startAttorneyReview(caseId: string) {
+  const caseRecord = await getCaseById(caseId);
+  if (!caseRecord) return;
+
+  const transition = buildAttorneyReviewStart(caseRecord);
+  if (!transition.allowed) return;
+
+  if (shouldUsePrismaStore()) {
+    await prisma.$transaction(async (tx) => {
+      if (transition.completedFollowUpTaskIds.length > 0) {
+        await tx.followUpTask.updateMany({
+          where: { id: { in: transition.completedFollowUpTaskIds } },
+          data: { status: FollowUpStatus.COMPLETED }
+        });
+      }
+
+      await tx.case.update({
+        where: { id: caseId },
+        data: { status: transition.nextStatus }
+      });
+
+      await tx.activityLog.createMany({
+        data: [
+          {
+            caseId,
+            ...activityDraft(ActivityType.ATTORNEY_REVIEW_STARTED, caseRecord.caseNumber)
+          },
+          {
+            caseId,
+            ...activityDraft(ActivityType.STATUS_CHANGED, labelFor(transition.nextStatus))
+          }
+        ]
+      });
+    });
+
+    revalidateCorePaths(caseId, caseRecord.clientId);
+    return;
+  }
+
+  const state = demoState();
+  const mutableCase = state.cases.find((item) => item.id === caseId);
+  if (!mutableCase) return;
+  const timestamp = now();
+
+  mutableCase.status = transition.nextStatus;
+  mutableCase.updatedAt = timestamp;
+
+  for (const task of state.followUpTasks.filter((item) => transition.completedFollowUpTaskIds.includes(item.id))) {
+    task.status = FollowUpStatus.COMPLETED;
+    task.updatedAt = timestamp;
+  }
+
+  state.activityLogs.push(
+    demoActivityLog(caseId, activityDraft(ActivityType.ATTORNEY_REVIEW_STARTED, mutableCase.caseNumber), timestamp),
+    demoActivityLog(caseId, activityDraft(ActivityType.STATUS_CHANGED, labelFor(transition.nextStatus)), timestamp)
+  );
+
+  revalidateCorePaths(caseId, mutableCase.clientId);
+}
+
 function recalculateDemoCase(state: LegalFlowState, caseId: string) {
   const caseRecord = state.cases.find((item) => item.id === caseId);
   if (!caseRecord) return null;
@@ -1000,8 +1341,13 @@ function recalculateDemoCase(state: LegalFlowState, caseId: string) {
   return { previousStatus, nextStatus: caseRecord.status };
 }
 
-function revalidateCorePaths(caseId?: string) {
+function revalidateCorePaths(caseId?: string, clientId?: string) {
   revalidatePath("/dashboard");
   revalidatePath("/clients");
-  if (caseId) revalidatePath(`/cases/${caseId}`);
+  revalidatePath("/review");
+  if (clientId) revalidatePath(`/clients/${clientId}`);
+  if (caseId) {
+    revalidatePath(`/cases/${caseId}`);
+    revalidatePath(`/cases/${caseId}/packet`);
+  }
 }

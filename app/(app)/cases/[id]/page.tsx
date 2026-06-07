@@ -1,28 +1,36 @@
 import {
-  Bot,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
   FileText,
   MessageSquareText,
   Plus,
-  RefreshCw
+  RefreshCw,
+  Send,
+  ScrollText
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import {
   addInternalNoteAction,
   completeFollowUpAction,
   createFollowUpAction,
+  markCaseReadyForReviewAction,
   markDocumentReceivedAction,
-  regenerateSummaryAction
+  markIntakeCompleteAction,
+  regenerateSummaryAction,
+  startAttorneyReviewAction,
+  updatePaymentStatusAction
 } from "@/lib/actions/legalflow-actions";
 import { getCaseById } from "@/lib/repositories/legalflow-repository";
+import { buildAttorneyReviewStart } from "@/lib/services/attorney-review";
+import { buildReviewReadiness, canSetReadyForAttorneyReview } from "@/lib/services/review-readiness";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { DocumentStatus, FollowUpStatus, FollowUpType, UrgencyLevel } from "@/types/legalflow";
+import { CaseStatus, DocumentStatus, FollowUpStatus, FollowUpType, PaymentStatus, UrgencyLevel } from "@/types/legalflow";
 import { formatDate, formatRelativeDate, labelFor } from "@/lib/utils/format";
 import { missingDocuments } from "@/lib/utils/status";
 
@@ -34,21 +42,30 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   if (!caseRecord) notFound();
 
   const missing = missingDocuments(caseRecord.documentRequests);
+  const reviewReadiness = buildReviewReadiness(caseRecord);
+  const canMarkReady = canSetReadyForAttorneyReview(caseRecord, reviewReadiness);
+  const reviewStart = buildAttorneyReviewStart(caseRecord);
 
   return (
     <div className="space-y-7">
       <PageHeader
         eyebrow={caseRecord.caseNumber}
         title={`${caseRecord.client.name} case workspace`}
-        description="A single operational surface for intake readiness, client follow-up, attorney review, and AI-assisted case context."
+        description="A single operational surface for intake readiness, client follow-up, attorney review, and case context."
         actions={
-          <form action={regenerateSummaryAction}>
-            <input type="hidden" name="caseId" value={caseRecord.id} />
-            <Button tone="secondary" type="submit">
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              Generate/update AI summary
-            </Button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href={`/cases/${caseRecord.id}/packet`} tone="secondary">
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              Preview packet
+            </ButtonLink>
+            <form action={regenerateSummaryAction}>
+              <input type="hidden" name="caseId" value={caseRecord.id} />
+              <Button tone="secondary" type="submit">
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Generate/update case summary
+              </Button>
+            </form>
+          </div>
         }
       />
 
@@ -90,43 +107,139 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
               </div>
               <div>
                 <dt className="text-docket">Payment</dt>
-                <dd className="mt-1">
+                <dd className="mt-1 space-y-3">
                   <StatusBadge value={caseRecord.paymentStatus} />
+                  <form action={updatePaymentStatusAction} className="grid gap-2">
+                    <input type="hidden" name="caseId" value={caseRecord.id} />
+                    <label className="sr-only" htmlFor="paymentStatus">
+                      Update payment status
+                    </label>
+                    <select
+                      className="focus-ring min-h-10 rounded-md border border-ledger bg-white px-3 text-sm text-ink"
+                      id="paymentStatus"
+                      name="paymentStatus"
+                      defaultValue={caseRecord.paymentStatus}
+                    >
+                      {Object.values(PaymentStatus).map((value) => (
+                        <option key={value} value={value}>
+                          {labelFor(value)}
+                        </option>
+                      ))}
+                    </select>
+                    <Button tone="secondary" type="submit">
+                      Update payment
+                    </Button>
+                  </form>
                 </dd>
               </div>
               <InfoItem label="Created" value={formatDate(caseRecord.createdAt)} />
               <InfoItem label="Last updated" value={formatDate(caseRecord.updatedAt)} />
             </dl>
           </Card>
+
+          <Card>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold text-ink">Review readiness</h2>
+                <p className="mt-1 text-sm leading-6 text-docket">{reviewReadiness.handoffSummary}</p>
+              </div>
+              <div className="rounded-md border border-ledger bg-bone/70 px-3 py-2 text-right">
+                <p className="text-xs font-semibold uppercase text-docket">Handoff</p>
+                <p className="text-xl font-semibold text-walnut">{reviewReadiness.readinessPercent}%</p>
+              </div>
+            </div>
+
+            <ul className="mt-5 space-y-3">
+              {reviewReadiness.checklist.map((item) => (
+                <li key={item.label} className="flex gap-3 text-sm">
+                  <span
+                    className={
+                      item.complete
+                        ? "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brief text-white"
+                        : "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-amber-900"
+                    }
+                    aria-hidden="true"
+                  >
+                    {item.complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : "!"}
+                  </span>
+                  <span>
+                    <span className="block font-semibold text-ink">{item.label}</span>
+                    <span className="block leading-5 text-docket">{item.detail}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-5 rounded-md border border-ledger/80 bg-paper p-3">
+              <p className="text-xs font-semibold uppercase text-docket">Next action</p>
+              <p className="mt-1 text-sm font-medium leading-6 text-ink">{reviewReadiness.nextAction}</p>
+            </div>
+
+            {!caseRecord.intakeCompleted ? (
+              <form action={markIntakeCompleteAction} className="mt-4">
+                <input type="hidden" name="caseId" value={caseRecord.id} />
+                <Button type="submit">
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  Mark intake complete
+                </Button>
+              </form>
+            ) : canMarkReady ? (
+              <form action={markCaseReadyForReviewAction} className="mt-4">
+                <input type="hidden" name="caseId" value={caseRecord.id} />
+                <Button type="submit">
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  Set status ready
+                </Button>
+              </form>
+            ) : reviewStart.allowed ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <ButtonLink href={`/cases/${caseRecord.id}/packet`} tone="secondary">
+                  <FileText className="h-4 w-4" aria-hidden="true" />
+                  Preview packet
+                </ButtonLink>
+                <form action={startAttorneyReviewAction}>
+                  <input type="hidden" name="caseId" value={caseRecord.id} />
+                  <Button type="submit">
+                    <Send className="h-4 w-4" aria-hidden="true" />
+                    Start attorney review
+                  </Button>
+                </form>
+              </div>
+            ) : caseRecord.status === CaseStatus.READY_FOR_ATTORNEY_REVIEW ? (
+              <p className="mt-4 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-900">
+                Status is synced with review readiness.
+              </p>
+            ) : null}
+          </Card>
         </div>
 
         <div className="space-y-5">
           <Card>
             <div className="flex items-center gap-3">
-              <Bot className="h-5 w-5 text-brief" aria-hidden="true" />
+              <ScrollText className="h-5 w-5 text-brief" aria-hidden="true" />
               <div>
-                <h2 className="text-base font-semibold text-ink">AI case summary</h2>
-                <p className="text-sm text-docket">Mock-generated, structured for attorney review.</p>
+                <h2 className="text-base font-semibold text-ink">Case summary</h2>
+                <p className="text-sm text-docket">Structured for attorney review.</p>
               </div>
             </div>
-            {caseRecord.aiSummary ? (
+            {caseRecord.summary ? (
               <div className="mt-5 space-y-5 text-sm leading-6">
                 <p className="rounded-md border border-ledger bg-paper p-4 text-ink">
-                  {caseRecord.aiSummary.situationSummary}
+                  {caseRecord.summary.situationSummary}
                 </p>
-                <SummaryList title="Key risks" items={caseRecord.aiSummary.keyRisks} />
-                <SummaryList title="Missing information" items={caseRecord.aiSummary.missingInformation} />
-                <SummaryList title="Recommended next steps" items={caseRecord.aiSummary.recommendedNextSteps} />
+                <SummaryList title="Key risks" items={caseRecord.summary.keyRisks} />
+                <SummaryList title="Missing information" items={caseRecord.summary.missingInformation} />
+                <SummaryList title="Recommended next steps" items={caseRecord.summary.recommendedNextSteps} />
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase text-docket">Priority level</p>
-                  <StatusBadge value={caseRecord.aiSummary.priorityLevel} />
+                  <StatusBadge value={caseRecord.summary.priorityLevel} />
                 </div>
               </div>
             ) : (
               <EmptyState
-                icon={Bot}
-                title="No AI summary yet"
-                description="Generate a structured mock summary to help the attorney review the intake quickly."
+                icon={ScrollText}
+                title="No case summary yet"
+                description="Generate a structured summary to help the attorney review the intake quickly."
                 className="mt-5"
               />
             )}
@@ -188,7 +301,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
                       <form action={completeFollowUpAction}>
                         <input type="hidden" name="taskId" value={task.id} />
                         <Button tone="secondary" type="submit">
-                          Complete
+                          {task.type === FollowUpType.QUESTIONNAIRE && !caseRecord.intakeCompleted
+                            ? "Mark intake complete"
+                            : "Complete"}
                         </Button>
                       </form>
                     ) : null}
