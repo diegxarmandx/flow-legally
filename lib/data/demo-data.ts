@@ -418,7 +418,9 @@ export function createDemoState(): LegalFlowState {
         `log_${index + 1}_c`,
         caseRecord.id,
         ActivityType.STATUS_CHANGED,
-        `Case status changed to ${caseRecord.status.replaceAll("_", " ").toLowerCase()}.`,
+        caseRecord.status === CaseStatus.READY_FOR_ATTORNEY_REVIEW
+          ? "Automation marked case ready for attorney review after readiness checks passed."
+          : `Case status changed to ${caseRecord.status.replaceAll("_", " ").toLowerCase()}.`,
         caseRecord.status === CaseStatus.READY_FOR_ATTORNEY_REVIEW ? 0 : 1
       )
     ]),
@@ -427,8 +429,12 @@ export function createDemoState(): LegalFlowState {
         `log_followup_${index + 1}`,
         followUpTask.caseId,
         ActivityType.FOLLOW_UP_CREATED,
-        `Follow-up generated: ${followUpTask.title}.`,
-        index < 5 ? 0 : 2
+        `Automation generated follow-up: ${followUpTask.title}.`,
+        followUpTask.type === FollowUpType.DOCUMENT_REMINDER || followUpTask.type === FollowUpType.PAYMENT
+          ? 0
+          : index < 5
+            ? 0
+            : 2
       )
     ),
     activity(

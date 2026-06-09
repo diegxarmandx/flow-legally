@@ -223,7 +223,9 @@ function AutomationQueueRow({ item }: { item: AutomationQueueItem }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
-            <Badge tone={item.status === "completed" ? "success" : "neutral"}>{labelFor(item.status)}</Badge>
+            <Badge tone={item.status === "completed" ? "success" : "neutral"}>
+              {automationStatusLabel(item.status)}
+            </Badge>
           </div>
           <p className="mt-2 text-sm leading-6 text-docket">{item.description}</p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-docket">
@@ -236,4 +238,13 @@ function AutomationQueueRow({ item }: { item: AutomationQueueItem }) {
       </div>
     </div>
   );
+}
+
+function automationStatusLabel(status: AutomationQueueItem["status"]) {
+  const labels: Record<AutomationQueueItem["status"], string> = {
+    completed: "Completed",
+    queued: "Queued",
+    monitoring: "Monitoring"
+  };
+  return labels[status];
 }

@@ -65,6 +65,8 @@ export function buildReviewReadiness(caseRecord: CaseRecord): ReviewReadiness {
       detail:
         openFollowUps.length === 0
           ? "No open follow-ups remain."
+          : reviewableStatuses.has(caseRecord.status)
+            ? `${openFollowUps.length} open follow-up${openFollowUps.length === 1 ? " is" : "s are"} owned inside the attorney review workflow.`
           : `${openFollowUps.length} open follow-up${openFollowUps.length === 1 ? "" : "s"} need ownership.`
     }
   ];

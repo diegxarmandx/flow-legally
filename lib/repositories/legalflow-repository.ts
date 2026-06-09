@@ -138,6 +138,10 @@ function activityDraft(type: ActivityType, subject: string): ActivityDraft {
   };
 }
 
+function explicitActivityDraft(type: ActivityType, message: string): ActivityDraft {
+  return { type, message };
+}
+
 function buildCaseReadiness(caseRecord: LegalCase, documentRequests: DocumentRequest[]) {
   return {
     status: calculateCaseStatus({ caseRecord, documentRequests }),
@@ -186,9 +190,14 @@ function buildIntakeActivityDrafts(input: {
   return [
     activityDraft(ActivityType.INTAKE_CREATED, input.clientName),
     ...input.documentRequests.map((document) => activityDraft(ActivityType.DOCUMENT_REQUESTED, document.title)),
-    ...input.taskDrafts.map((taskDraft) => activityDraft(ActivityType.FOLLOW_UP_CREATED, taskDraft.title)),
+    ...input.taskDrafts.map((taskDraft) =>
+      explicitActivityDraft(ActivityType.FOLLOW_UP_CREATED, `Automation generated follow-up: ${taskDraft.title}.`)
+    ),
     activityDraft(ActivityType.SUMMARY_GENERATED, input.caseNumber),
-    activityDraft(ActivityType.STATUS_CHANGED, labelFor(input.status))
+    explicitActivityDraft(
+      ActivityType.STATUS_CHANGED,
+      `Automation set case status to ${labelFor(input.status)} during intake creation.`
+    )
   ];
 }
 
@@ -1248,7 +1257,10 @@ export async function markCaseReadyForReview(caseId: string) {
       await tx.activityLog.create({
         data: {
           caseId,
-          ...activityDraft(ActivityType.STATUS_CHANGED, labelFor(CaseStatus.READY_FOR_ATTORNEY_REVIEW))
+          ...explicitActivityDraft(
+            ActivityType.STATUS_CHANGED,
+            `Automation marked case ready for attorney review after readiness checks passed.`
+          )
         }
       });
     });
@@ -1266,7 +1278,10 @@ export async function markCaseReadyForReview(caseId: string) {
   state.activityLogs.push(
     demoActivityLog(
       caseId,
-      activityDraft(ActivityType.STATUS_CHANGED, labelFor(CaseStatus.READY_FOR_ATTORNEY_REVIEW)),
+      explicitActivityDraft(
+        ActivityType.STATUS_CHANGED,
+        `Automation marked case ready for attorney review after readiness checks passed.`
+      ),
       timestamp
     )
   );

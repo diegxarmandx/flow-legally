@@ -10,8 +10,8 @@ import {
 } from "@/types/legalflow";
 import { labelFor } from "@/lib/utils/format";
 
-export type TimelineActor = "Automation" | "Team" | "Attorney";
-export type TimelineTone = "automation" | "human" | "attorney";
+export type TimelineActor = "Automation" | "System" | "Team" | "Attorney";
+export type TimelineTone = "automation" | "system" | "human" | "attorney";
 export type TimelineIconName =
   | "workflow"
   | "scroll"
@@ -48,7 +48,15 @@ function mapActivityLog(caseRecord: CaseRecord, log: ActivityLog): AutomationTim
 
   if (log.type === ActivityType.FOLLOW_UP_CREATED) {
     const task = findFollowUpForLog(caseRecord.followUpTasks, log.message);
-    return automationEntry(log, followUpCopy(task));
+    if (log.message.toLowerCase().startsWith("automation generated")) {
+      return automationEntry(log, followUpCopy(task));
+    }
+
+    return humanEntry(log, {
+      icon: "workflow",
+      title: "Team created follow-up",
+      description: log.message
+    });
   }
 
   if (log.type === ActivityType.DOCUMENT_REQUESTED) {
@@ -63,18 +71,25 @@ function mapActivityLog(caseRecord: CaseRecord, log: ActivityLog): AutomationTim
     const readyLabel = labelFor(CaseStatus.READY_FOR_ATTORNEY_REVIEW).toLowerCase();
     const isReadyStatus = log.message.toLowerCase().includes(readyLabel);
     const isHighPriority = log.message.toLowerCase().includes("high priority");
-    return automationEntry(log, {
-      icon: isReadyStatus ? "check" : isHighPriority ? "flag" : "workflow",
-      title: isReadyStatus
-        ? "Automation marked case ready for attorney review"
-        : isHighPriority
-          ? "Automation marked case high priority"
-          : "Automation updated case status",
-      description: isReadyStatus
-        ? "Readiness rules found no blocking intake, document, payment, summary, or follow-up issues."
-        : isHighPriority
-          ? log.message
+    const isAutomationStatus = log.message.toLowerCase().startsWith("automation");
+    if (isAutomationStatus) {
+      return automationEntry(log, {
+        icon: isReadyStatus ? "check" : isHighPriority ? "flag" : "workflow",
+        title: isReadyStatus
+          ? "Automation marked case ready for attorney review"
+          : isHighPriority
+            ? "Automation marked case high priority"
+            : "Automation updated case status",
+        description: isReadyStatus
+          ? "Readiness rules found no blocking intake, document, payment, summary, or follow-up issues."
           : log.message
+      });
+    }
+
+    return systemEntry(log, {
+      icon: isReadyStatus ? "check" : isHighPriority ? "flag" : "workflow",
+      title: "System recalculated case status",
+      description: log.message
     });
   }
 
@@ -157,6 +172,19 @@ function humanEntry(
     id: log.id,
     actor: "Team",
     tone: "human",
+    ...copy,
+    createdAt: log.createdAt
+  };
+}
+
+function systemEntry(
+  log: ActivityLog,
+  copy: Pick<AutomationTimelineEntry, "icon" | "title" | "description">
+): AutomationTimelineEntry {
+  return {
+    id: log.id,
+    actor: "System",
+    tone: "system",
     ...copy,
     createdAt: log.createdAt
   };

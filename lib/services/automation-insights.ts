@@ -1,13 +1,12 @@
 import {
   ActivityType,
-  CaseStatus,
   FollowUpType,
-  UrgencyLevel,
   type AutomationQueueData,
   type AutomationQueueItem,
+  type ActivityLog,
   type CaseRecord
 } from "@/types/legalflow";
-import { activeFollowUps, isPaymentBlocking, missingDocuments } from "@/lib/utils/status";
+import { isActiveCase, isPaymentBlocking, missingDocuments } from "@/lib/utils/status";
 
 const MINUTES_SAVED = {
   documentReminder: 5,
@@ -18,25 +17,27 @@ const MINUTES_SAVED = {
 } as const;
 
 export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): AutomationQueueData {
-  const openTasks = cases.flatMap((caseRecord) => activeFollowUps(caseRecord.followUpTasks));
-  const documentReminderCount = openTasks.filter((task) => task.type === FollowUpType.DOCUMENT_REMINDER).length;
-  const paymentFollowUpCount = openTasks.filter((task) => task.type === FollowUpType.PAYMENT).length;
-  const readyForReviewCount = cases.filter(
-    (caseRecord) => caseRecord.status === CaseStatus.READY_FOR_ATTORNEY_REVIEW
+  const activeCases = cases.filter((caseRecord) => isActiveCase(caseRecord.status));
+  const todayLogs = activeCases.flatMap((caseRecord) =>
+    caseRecord.activityLogs.filter((log) => isSameUtcDay(log.createdAt, today))
+  );
+  const documentReminderCount = countTodayFollowUps(activeCases, todayLogs, FollowUpType.DOCUMENT_REMINDER);
+  const paymentFollowUpCount = countTodayFollowUps(activeCases, todayLogs, FollowUpType.PAYMENT);
+  const readyForReviewCount = todayLogs.filter(
+    (log) =>
+      log.type === ActivityType.STATUS_CHANGED &&
+      log.message.toLowerCase().includes("ready for attorney review")
   ).length;
-  const summaryCount = countTodayAutomationEvents(cases, ActivityType.SUMMARY_GENERATED, today);
-  const highPriorityCount = cases.filter(
-    (caseRecord) =>
-      caseRecord.urgencyLevel === UrgencyLevel.HIGH ||
-      caseRecord.urgencyLevel === UrgencyLevel.CRITICAL ||
-      caseRecord.priorityScore >= 75
+  const summaryCount = todayLogs.filter((log) => log.type === ActivityType.SUMMARY_GENERATED).length;
+  const highPriorityCount = todayLogs.filter(
+    (log) => log.type === ActivityType.STATUS_CHANGED && log.message.toLowerCase().includes("high priority")
   ).length;
 
-  const detectedDocumentBlockers = cases.reduce(
+  const detectedDocumentBlockers = activeCases.reduce(
     (total, caseRecord) => total + missingDocuments(caseRecord.documentRequests).length,
     0
   );
-  const detectedPaymentBlockers = cases.filter((caseRecord) => isPaymentBlocking(caseRecord.paymentStatus)).length;
+  const detectedPaymentBlockers = activeCases.filter((caseRecord) => isPaymentBlocking(caseRecord.paymentStatus)).length;
 
   const items = compactQueueItems([
     {
@@ -45,7 +46,7 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       description: `${detectedDocumentBlockers} missing or requested document${detectedDocumentBlockers === 1 ? "" : "s"} detected across active cases.`,
       count: documentReminderCount,
       category: "document",
-      timestampLabel: "Queued from open follow-ups",
+      timestampLabel: "Generated from today's activity logs",
       minutesSaved: documentReminderCount * MINUTES_SAVED.documentReminder,
       status: "queued"
     },
@@ -55,7 +56,7 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       description: `${detectedPaymentBlockers} case${detectedPaymentBlockers === 1 ? "" : "s"} currently block attorney time because payment is not clear.`,
       count: paymentFollowUpCount,
       category: "payment",
-      timestampLabel: "Scheduled by payment rules",
+      timestampLabel: "Scheduled from today's activity logs",
       minutesSaved: paymentFollowUpCount * MINUTES_SAVED.paymentFollowUp,
       status: "queued"
     },
@@ -65,7 +66,7 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       description: "Readiness rules checked intake, documents, payment, summary, and follow-up ownership.",
       count: readyForReviewCount,
       category: "readiness",
-      timestampLabel: "Ready queue updated",
+      timestampLabel: "Updated today",
       minutesSaved: readyForReviewCount * MINUTES_SAVED.readinessRouting,
       status: "completed"
     },
@@ -85,9 +86,9 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       description: "Urgency and priority scoring keep critical cases from getting buried in routine intake work.",
       count: highPriorityCount,
       category: "priority",
-      timestampLabel: "Monitored continuously",
+      timestampLabel: "Triaged today",
       minutesSaved: highPriorityCount * MINUTES_SAVED.priorityTriage,
-      status: "monitoring"
+      status: "completed"
     }
   ]);
 
@@ -103,13 +104,15 @@ function compactQueueItems(items: AutomationQueueItem[]) {
   return items.filter((item) => item.count > 0);
 }
 
-function countTodayAutomationEvents(cases: CaseRecord[], type: ActivityType, today: Date) {
-  return cases.reduce(
-    (total, caseRecord) =>
-      total +
-      caseRecord.activityLogs.filter((log) => log.type === type && isSameUtcDay(log.createdAt, today)).length,
-    0
-  );
+function countTodayFollowUps(cases: CaseRecord[], todayLogs: ActivityLog[], type: FollowUpType) {
+  return todayLogs.filter((log) => {
+    if (log.type !== ActivityType.FOLLOW_UP_CREATED) return false;
+    return cases.some((caseRecord) =>
+      caseRecord.followUpTasks.some(
+        (task) => task.type === type && log.caseId === task.caseId && log.message.includes(task.title)
+      )
+    );
+  }).length;
 }
 
 function isSameUtcDay(value: string, date: Date) {

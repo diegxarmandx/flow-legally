@@ -96,6 +96,20 @@ function caseFixture(overrides: Partial<CaseRecord> = {}): CaseRecord {
     internalNotes: [],
     activityLogs: [
       {
+        id: "log_doc_followup",
+        caseId: "case_test",
+        type: ActivityType.FOLLOW_UP_CREATED,
+        message: "Automation generated follow-up: Request contract draft.",
+        createdAt: todayIso
+      },
+      {
+        id: "log_payment_followup",
+        caseId: "case_test",
+        type: ActivityType.FOLLOW_UP_CREATED,
+        message: "Automation generated follow-up: Confirm payment.",
+        createdAt: todayIso
+      },
+      {
         id: "log_summary",
         caseId: "case_test",
         type: ActivityType.SUMMARY_GENERATED,
@@ -116,16 +130,29 @@ describe("automation insights", () => {
   });
 
   it("builds queue items from document, payment, readiness, summary, and priority signals", () => {
-    const queue = buildAutomationQueue(
-      [
-        caseFixture({
-          status: CaseStatus.READY_FOR_ATTORNEY_REVIEW,
-          documentRequests: [],
-          paymentStatus: PaymentStatus.PAID
-        })
-      ],
-      today
+    const readyCase = caseFixture({
+      status: CaseStatus.READY_FOR_ATTORNEY_REVIEW,
+      documentRequests: [],
+      paymentStatus: PaymentStatus.PAID
+    });
+    readyCase.activityLogs.push(
+      {
+        id: "log_ready",
+        caseId: "case_test",
+        type: ActivityType.STATUS_CHANGED,
+        message: "Automation marked case ready for attorney review after readiness checks passed.",
+        createdAt: todayIso
+      },
+      {
+        id: "log_priority",
+        caseId: "case_test",
+        type: ActivityType.STATUS_CHANGED,
+        message: "Automation marked case high priority based on critical urgency.",
+        createdAt: todayIso
+      }
     );
+
+    const queue = buildAutomationQueue([readyCase], today);
 
     expect(queue.items.map((item) => item.id)).toEqual([
       "document-reminders",
@@ -156,5 +183,21 @@ describe("automation insights", () => {
     );
 
     expect(queue.items.some((item) => item.id === "summaries-generated")).toBe(false);
+  });
+
+  it("excludes closed cases from current automation queue counts", () => {
+    const queue = buildAutomationQueue(
+      [
+        caseFixture({
+          status: CaseStatus.CLOSED,
+          urgencyLevel: UrgencyLevel.CRITICAL,
+          priorityScore: 100
+        })
+      ],
+      today
+    );
+
+    expect(queue.items).toEqual([]);
+    expect(queue.totalEstimatedMinutesSaved).toBe(0);
   });
 });

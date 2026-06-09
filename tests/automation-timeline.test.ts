@@ -128,7 +128,7 @@ describe("automation timeline", () => {
           id: "log_followup",
           caseId: "case_timeline",
           type: ActivityType.FOLLOW_UP_CREATED,
-          message: "Follow-up generated: Request prior court filings.",
+          message: "Automation generated follow-up: Request prior court filings.",
           createdAt: timestamp
         }
       ]
@@ -152,7 +152,7 @@ describe("automation timeline", () => {
           id: "log_ready",
           caseId: "case_timeline",
           type: ActivityType.STATUS_CHANGED,
-          message: "Case status changed to Ready for Attorney Review.",
+          message: "Automation marked case ready for attorney review after readiness checks passed.",
           createdAt: timestamp
         },
         {
@@ -169,6 +169,27 @@ describe("automation timeline", () => {
       "Automation marked case ready for attorney review",
       "Automation marked case high priority"
     ]);
+  });
+
+  it("labels generic status changes as system recalculations", () => {
+    const timeline = buildAutomationTimeline({
+      ...baseCase,
+      activityLogs: [
+        {
+          id: "log_status",
+          caseId: "case_timeline",
+          type: ActivityType.STATUS_CHANGED,
+          message: "Case status changed to Payment Pending.",
+          createdAt: timestamp
+        }
+      ]
+    });
+
+    expect(timeline[0]).toMatchObject({
+      actor: "System",
+      tone: "system",
+      title: "System recalculated case status"
+    });
   });
 
   it("labels attorney notes separately from automation events", () => {
