@@ -13,9 +13,10 @@ Law firm intake teams often track case readiness across email, spreadsheets, not
 ## Core Features
 
 - Legal operations dashboard with active cases, incomplete intake, missing documents, pending payment, and ready-for-review metrics.
+- Today's Automation Queue showing generated document reminders, payment follow-ups, ready-for-review routing, AI summaries, priority triage, and estimated time saved.
 - Client list with search, case counts, last activity, and latest case status.
 - Professional intake form with Zod validation and case-type document checklists.
-- Case workspace with client info, review readiness, case summary, document requests, follow-up tasks, notes, and activity timeline.
+- Case workspace with client info, review readiness, case summary, document requests, follow-up tasks, notes, and an automation-aware timeline.
 - Mock case summary service with structured outputs: situation, risks, missing information, next steps, and priority.
 - Review-readiness service that turns intake, document, payment, summary, and follow-up state into an attorney handoff checklist.
 - Follow-up automation service that creates questionnaire, document, payment, and high-priority review tasks while avoiding duplicate active tasks.
@@ -25,10 +26,11 @@ Law firm intake teams often track case readiness across email, spreadsheets, not
 ## Product Walkthrough
 
 1. Open `/dashboard` to see operational bottlenecks and recent case readiness.
-2. Open `/clients` to search clients and jump into case workspaces.
-3. Use `/intake/new` to create a client intake. The app creates the case, document requests, follow-ups, case summary, and activity logs.
-4. Open `/cases/[id]` to mark intake complete, update payment, mark documents received, complete tasks, add notes, and regenerate the case summary.
-5. Open `/engineering` to review architecture, tradeoffs, edge cases, and Glade.ai relevance.
+2. Review Today's Automation Queue to see which rules generated reminders, payment follow-ups, summaries, and readiness actions.
+3. Open `/clients` to search clients and jump into case workspaces.
+4. Use `/intake/new` to create a client intake. The app creates the case, document requests, follow-ups, case summary, and activity logs.
+5. Open `/cases/[id]` to mark intake complete, update payment, mark documents received, complete tasks, add notes, regenerate the case summary, and inspect the automation timeline.
+6. Open `/engineering` to review architecture, tradeoffs, edge cases, and Glade.ai relevance.
 
 ## Tech Stack
 
@@ -50,6 +52,8 @@ The app uses server-rendered pages with Server Actions for mutations. UI compone
 Business logic stays out of React components:
 
 - `lib/services/case-status.ts` calculates readiness and status.
+- `lib/services/automation-insights.ts` derives Today's Automation Queue and estimated time saved from case, payment, document, summary, and follow-up data.
+- `lib/services/automation-timeline.ts` maps activity logs into automation, team, and attorney timeline entries.
 - `lib/services/review-readiness.ts` builds the attorney handoff checklist and next best action.
 - `lib/services/follow-up-automation.ts` creates operational follow-up tasks.
 - `lib/services/summary.ts` generates deterministic mock case summaries.
@@ -77,6 +81,10 @@ The follow-up service creates:
 - Attorney triage task for high or critical urgency.
 
 It checks existing open tasks by type to avoid duplicate active follow-ups for the same issue.
+
+The dashboard automation queue uses the same operational data to show what the platform handled today: generated document reminders, payment follow-ups, ready-for-review routing, summary generation, and priority triage. The estimated time saved is intentionally conservative and rule-based so the demo communicates automation value without pretending to run production background jobs.
+
+The case timeline classifies activity logs as automation, team, or attorney work. Automation-generated events include summary generation, document requests, follow-up creation, ready-for-review routing, and priority triage. Human events include notes, payment updates, received documents, completed follow-ups, and attorney review starts.
 
 ## Case Summary Explanation
 

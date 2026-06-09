@@ -15,6 +15,11 @@ const sections = [
     body: "Law firms lose time when intake completion, missing evidence, payment follow-up, and attorney review readiness live across email, spreadsheets, and memory. The dashboard makes blockers visible and actionable."
   },
   {
+    title: "Automation queue",
+    icon: Workflow,
+    body: "Today's Automation Queue translates case, document, payment, summary, and follow-up signals into generated work and conservative time-saved estimates."
+  },
+  {
     title: "Architecture",
     icon: GitBranch,
     body: "Next.js App Router renders server-first product pages. Server Actions call a repository layer, which uses Prisma/PostgreSQL when configured and a seeded demo store when reviewers run without a database."
@@ -40,6 +45,9 @@ const edgeCases = [
   "Empty client list and case list states",
   "Invalid intake input with useful validation messages",
   "Duplicate active follow-up prevention",
+  "No automation events",
+  "Only human activity events",
+  "Only automation activity events",
   "Cases with no case summary",
   "All documents complete and payment clear",
   "Payment pending after document readiness",
@@ -85,6 +93,10 @@ export default function EngineeringPage() {
             <Tradeoff
               label="Fallback demo store"
               value="Reviewers can run the product without PostgreSQL, while the Prisma schema and seed path demonstrate the intended persistence model."
+            />
+            <Tradeoff
+              label="Automation timing"
+              value="The automation queue is derived from current case data and seeded activity logs. Production would move scheduling into background jobs with delivery audit records."
             />
           </div>
         </Card>

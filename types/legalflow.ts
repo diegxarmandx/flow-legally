@@ -220,11 +220,36 @@ export type RecentCaseRow = {
   priority: string;
 };
 
+export type AutomationQueueCategory =
+  | "document"
+  | "payment"
+  | "readiness"
+  | "summary"
+  | "priority";
+
+export type AutomationQueueItem = {
+  id: string;
+  title: string;
+  description: string;
+  count: number;
+  category: AutomationQueueCategory;
+  timestampLabel: string;
+  minutesSaved: number;
+  status: "completed" | "queued" | "monitoring";
+};
+
+export type AutomationQueueData = {
+  items: AutomationQueueItem[];
+  totalEstimatedMinutesSaved: number;
+  sourceDescription: string;
+};
+
 export type DashboardData = {
   firm: Firm;
   metrics: DashboardMetrics;
   recentCases: RecentCaseRow[];
   insights: string[];
+  automationQueue: AutomationQueueData;
   mode: "postgres" | "demo";
 };
 

@@ -1,11 +1,26 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, CreditCard, Database, FileWarning } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ClipboardCheck,
+  ClipboardList,
+  CreditCard,
+  Database,
+  FileText,
+  FileWarning,
+  Flag,
+  ScrollText,
+  Workflow
+} from "lucide-react";
 import Link from "next/link";
 import { getDashboardData } from "@/lib/repositories/legalflow-repository";
+import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatRelativeDate, labelFor } from "@/lib/utils/format";
+import type { AutomationQueueCategory, AutomationQueueItem } from "@/types/legalflow";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +84,45 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      <Card>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3">
+              <Workflow className="h-5 w-5 text-brief" aria-hidden="true" />
+              <div>
+                <h2 className="text-base font-semibold text-ink">Today&apos;s Automation Queue</h2>
+                <p className="text-sm text-docket">
+                  These actions are based on the same automation service used during intake creation.
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-docket">{data.automationQueue.sourceDescription}</p>
+          </div>
+          <div className="rounded-md border border-ledger bg-bone/70 px-4 py-3 lg:text-right">
+            <p className="text-xs font-semibold uppercase text-docket">Estimated time saved</p>
+            <p className="mt-1 text-2xl font-semibold text-walnut">
+              {data.automationQueue.totalEstimatedMinutesSaved} min
+            </p>
+            <p className="mt-1 text-xs text-docket">approximately today</p>
+          </div>
+        </div>
+
+        {data.automationQueue.items.length === 0 ? (
+          <EmptyState
+            className="mt-5"
+            icon={ClipboardCheck}
+            title="No automation actions detected today"
+            description="As intake, document, payment, summary, and readiness rules run, generated work appears here."
+          />
+        ) : (
+          <div className="mt-5 grid gap-3 xl:grid-cols-2">
+            {data.automationQueue.items.map((item) => (
+              <AutomationQueueRow key={item.id} item={item} />
+            ))}
+          </div>
+        )}
+      </Card>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <Card className="overflow-hidden p-0">
@@ -143,6 +197,41 @@ export default async function DashboardPage() {
               automation that helps a service business move cases forward.
             </p>
           </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const automationIcons: Record<AutomationQueueCategory, typeof Workflow> = {
+  document: FileText,
+  payment: CreditCard,
+  readiness: ClipboardCheck,
+  summary: ScrollText,
+  priority: Flag
+};
+
+function AutomationQueueRow({ item }: { item: AutomationQueueItem }) {
+  const Icon = automationIcons[item.category];
+
+  return (
+    <div className="rounded-md border border-ledger/80 bg-paper p-4">
+      <div className="flex gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-ledger bg-vellum text-brief">
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
+            <Badge tone={item.status === "completed" ? "success" : "neutral"}>{labelFor(item.status)}</Badge>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-docket">{item.description}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-docket">
+            <span className="rounded-md border border-ledger bg-white px-2 py-1">{item.timestampLabel}</span>
+            <span className="rounded-md border border-ledger bg-white px-2 py-1">
+              {item.minutesSaved} min saved
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -2,12 +2,16 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
+  CreditCard,
   FileText,
+  Flag,
   MessageSquareText,
   Plus,
   RefreshCw,
+  Scale,
   Send,
-  ScrollText
+  ScrollText,
+  Workflow
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import {
@@ -23,7 +27,9 @@ import {
 } from "@/lib/actions/legalflow-actions";
 import { getCaseById } from "@/lib/repositories/legalflow-repository";
 import { buildAttorneyReviewStart } from "@/lib/services/attorney-review";
+import { buildAutomationTimeline, type TimelineIconName, type TimelineTone } from "@/lib/services/automation-timeline";
 import { buildReviewReadiness, canSetReadyForAttorneyReview } from "@/lib/services/review-readiness";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -45,6 +51,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const reviewReadiness = buildReviewReadiness(caseRecord);
   const canMarkReady = canSetReadyForAttorneyReview(caseRecord, reviewReadiness);
   const reviewStart = buildAttorneyReviewStart(caseRecord);
+  const automationTimeline = buildAutomationTimeline(caseRecord);
 
   return (
     <div className="space-y-7">
@@ -387,21 +394,71 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
             <Card>
               <div className="flex items-center gap-3">
                 <ClipboardCheck className="h-5 w-5 text-brief" aria-hidden="true" />
-                <h2 className="text-base font-semibold text-ink">Activity timeline</h2>
+                <div>
+                  <h2 className="text-base font-semibold text-ink">Automation timeline</h2>
+                  <p className="text-sm text-docket">Background rules and team actions in one audit trail.</p>
+                </div>
               </div>
-              <ol className="mt-5 space-y-3">
-                {caseRecord.activityLogs.map((log) => (
-                  <li key={log.id} className="border-l-2 border-ledger pl-4">
-                    <p className="text-sm font-medium text-ink">{log.message}</p>
-                    <p className="mt-1 text-xs text-docket">{formatDate(log.createdAt)}</p>
-                  </li>
-                ))}
-              </ol>
+              {automationTimeline.length === 0 ? (
+                <EmptyState
+                  className="mt-5"
+                  icon={Workflow}
+                  title="No timeline activity yet"
+                  description="Automation and team events will appear here as the case moves through intake and review."
+                />
+              ) : (
+                <ol className="mt-5 space-y-3" aria-label="Case automation and activity timeline">
+                  {automationTimeline.map((entry) => (
+                    <li key={entry.id} className="relative pl-12">
+                      <TimelineIcon icon={entry.icon} tone={entry.tone} />
+                      <div className="rounded-md border border-ledger bg-paper p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge tone={entry.tone === "automation" ? "info" : entry.tone === "attorney" ? "success" : "neutral"}>
+                            {entry.actor}
+                          </Badge>
+                          <p className="text-sm font-semibold text-ink">{entry.title}</p>
+                        </div>
+                        <p className="mt-2 break-words text-sm leading-6 text-docket">{entry.description}</p>
+                        <p className="mt-2 text-xs text-docket">{formatDate(entry.createdAt)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </Card>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+const timelineIcons: Record<TimelineIconName, typeof Workflow> = {
+  workflow: Workflow,
+  scroll: ScrollText,
+  file: FileText,
+  "credit-card": CreditCard,
+  check: CheckCircle2,
+  note: MessageSquareText,
+  scale: Scale,
+  flag: Flag
+};
+
+function TimelineIcon({ icon, tone }: { icon: TimelineIconName; tone: TimelineTone }) {
+  const Icon = timelineIcons[icon];
+
+  return (
+    <span
+      className={
+        tone === "automation"
+          ? "absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-brief"
+          : tone === "attorney"
+            ? "absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800"
+            : "absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border border-ledger bg-white text-docket"
+      }
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </span>
   );
 }
 

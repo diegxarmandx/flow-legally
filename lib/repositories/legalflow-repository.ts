@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { activityMessage } from "@/lib/services/activity-log";
+import { buildAutomationQueue } from "@/lib/services/automation-insights";
 import { generateSummary } from "@/lib/services/summary";
 import { buildAttorneyReviewStart } from "@/lib/services/attorney-review";
 import { calculateCaseStatus, calculatePriorityScore } from "@/lib/services/case-status";
@@ -401,6 +402,7 @@ function dashboardFromCases(firm: Firm, cases: CaseRecord[], mode: DashboardData
     firm,
     metrics,
     insights,
+    automationQueue: buildAutomationQueue(cases),
     recentCases: cases.sort(sortNewestFirst).slice(0, 8).map(recentRow),
     mode
   };

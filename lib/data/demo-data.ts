@@ -351,7 +351,8 @@ export function createDemoState(): LegalFlowState {
     task("task_005", "case_005", "Complete beneficiary questionnaire", FollowUpType.QUESTIONNAIRE, 4, FollowUpStatus.OPEN, UrgencyLevel.LOW),
     task("task_006", "case_006", "Attorney review prep", FollowUpType.ATTORNEY_REVIEW, 1, FollowUpStatus.COMPLETED, UrgencyLevel.HIGH),
     task("task_007", "case_007", "Send intake questionnaire reminder", FollowUpType.QUESTIONNAIRE, 1, FollowUpStatus.OPEN, UrgencyLevel.STANDARD),
-    task("task_008", "case_010", "Follow up on overdue planning fee", FollowUpType.PAYMENT, 1, FollowUpStatus.OPEN, UrgencyLevel.STANDARD)
+    task("task_008", "case_010", "Follow up on overdue planning fee", FollowUpType.PAYMENT, 1, FollowUpStatus.OPEN, UrgencyLevel.STANDARD),
+    task("task_009", "case_007", "Remind Amara to send government ID", FollowUpType.DOCUMENT_REMINDER, 2, FollowUpStatus.OPEN, UrgencyLevel.STANDARD)
   ];
 
   const summaries = cases
@@ -393,11 +394,67 @@ export function createDemoState(): LegalFlowState {
     }
   ];
 
-  const activityLogs = cases.flatMap((caseRecord, index) => [
-    activity(`log_${index + 1}_a`, caseRecord.id, ActivityType.INTAKE_CREATED, `Intake created for ${caseRecord.caseNumber}.`, caseRecord.createdAt === caseRecord.updatedAt ? 3 : 8),
-    activity(`log_${index + 1}_b`, caseRecord.id, ActivityType.SUMMARY_GENERATED, `Case summary generated for ${caseRecord.caseNumber}.`, 2),
-    activity(`log_${index + 1}_c`, caseRecord.id, ActivityType.STATUS_CHANGED, `Case status changed to ${caseRecord.status.replaceAll("_", " ").toLowerCase()}.`, 1)
-  ]);
+  const activityLogs = [
+    ...cases.flatMap((caseRecord, index) => [
+      activity(
+        `log_${index + 1}_a`,
+        caseRecord.id,
+        ActivityType.INTAKE_CREATED,
+        `Intake created for ${caseRecord.caseNumber}.`,
+        caseRecord.createdAt === caseRecord.updatedAt ? 3 : 8
+      ),
+      ...(caseRecord.id !== "case_007"
+        ? [
+            activity(
+              `log_${index + 1}_b`,
+              caseRecord.id,
+              ActivityType.SUMMARY_GENERATED,
+              `Case summary generated for ${caseRecord.caseNumber}.`,
+              index < 4 ? 0 : 2
+            )
+          ]
+        : []),
+      activity(
+        `log_${index + 1}_c`,
+        caseRecord.id,
+        ActivityType.STATUS_CHANGED,
+        `Case status changed to ${caseRecord.status.replaceAll("_", " ").toLowerCase()}.`,
+        caseRecord.status === CaseStatus.READY_FOR_ATTORNEY_REVIEW ? 0 : 1
+      )
+    ]),
+    ...followUpTasks.map((followUpTask, index) =>
+      activity(
+        `log_followup_${index + 1}`,
+        followUpTask.caseId,
+        ActivityType.FOLLOW_UP_CREATED,
+        `Follow-up generated: ${followUpTask.title}.`,
+        index < 5 ? 0 : 2
+      )
+    ),
+    activity(
+      "log_priority_case_004",
+      "case_004",
+      ActivityType.STATUS_CHANGED,
+      "Automation marked case high priority based on critical urgency and attorney review readiness.",
+      0
+    ),
+    activity(
+      "log_priority_case_008",
+      "case_008",
+      ActivityType.STATUS_CHANGED,
+      "Automation marked case high priority based on emergency consultation details.",
+      0
+    ),
+    ...internalNotes.map((note, index) =>
+      activity(
+        `log_note_${index + 1}`,
+        note.caseId,
+        ActivityType.NOTE_ADDED,
+        `Internal note added: ${note.body.slice(0, 80)}.`,
+        index === 1 ? 0 : 3
+      )
+    )
+  ];
 
   return {
     firm,
