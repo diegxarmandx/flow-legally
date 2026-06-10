@@ -27,7 +27,12 @@ import {
 } from "@/lib/actions/legalflow-actions";
 import { getCaseById } from "@/lib/repositories/legalflow-repository";
 import { buildAttorneyReviewStart } from "@/lib/services/attorney-review";
-import { buildAutomationTimeline, type TimelineIconName, type TimelineTone } from "@/lib/services/automation-timeline";
+import {
+  buildAutomationTimeline,
+  type AutomationTimelineEntry,
+  type TimelineIconName,
+  type TimelineTone
+} from "@/lib/services/automation-timeline";
 import { buildReviewReadiness, canSetReadyForAttorneyReview } from "@/lib/services/review-readiness";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -218,6 +223,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
               </p>
             ) : null}
           </Card>
+
         </div>
 
         <div className="min-w-0 space-y-5">
@@ -353,83 +359,94 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
             </form>
           </Card>
 
-          <div className="grid min-w-0 gap-5 xl:grid-cols-2">
-            <Card>
-              <div className="flex items-center gap-3">
-                <MessageSquareText className="h-5 w-5 text-brief" aria-hidden="true" />
-                <h2 className="text-base font-semibold text-ink">Internal notes</h2>
-              </div>
-              <div className="mt-5 space-y-3">
-                {caseRecord.internalNotes.length === 0 ? (
-                  <p className="text-sm text-docket">No internal notes yet.</p>
-                ) : (
-                  caseRecord.internalNotes.map((note) => (
-                    <div key={note.id} className="rounded-md border border-ledger bg-paper p-3 text-sm">
-                      <p className="break-words leading-6 text-ink">{note.body}</p>
-                      <p className="mt-2 text-xs text-docket">
-                        {note.author?.name ?? "Team member"} on {formatDate(note.createdAt)}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-              <form action={addInternalNoteAction} className="mt-5 space-y-3">
-                <input type="hidden" name="caseId" value={caseRecord.id} />
-                <label className="text-sm font-semibold text-ink" htmlFor="body">
-                  Add note
-                </label>
-                <textarea
-                  className="focus-ring min-h-28 w-full rounded-md border border-ledger bg-white px-3 py-2 text-sm"
-                  id="body"
-                  name="body"
-                  minLength={3}
-                  required
-                />
-                <Button tone="secondary" type="submit">
-                  Save note
-                </Button>
-              </form>
-            </Card>
-
-            <Card>
-              <div className="flex items-center gap-3">
-                <ClipboardCheck className="h-5 w-5 text-brief" aria-hidden="true" />
-                <div className="min-w-0">
-                  <h2 className="text-base font-semibold text-ink">Automation timeline</h2>
-                  <p className="text-sm text-docket">Background rules and team actions in one audit trail.</p>
-                </div>
-              </div>
-              {automationTimeline.length === 0 ? (
-                <EmptyState
-                  className="mt-5"
-                  icon={Workflow}
-                  title="No timeline activity yet"
-                  description="Automation and team events will appear here as the case moves through intake and review."
-                />
+          <Card>
+            <div className="flex items-center gap-3">
+              <MessageSquareText className="h-5 w-5 text-brief" aria-hidden="true" />
+              <h2 className="text-base font-semibold text-ink">Internal notes</h2>
+            </div>
+            <div className="mt-5 space-y-3">
+              {caseRecord.internalNotes.length === 0 ? (
+                <p className="text-sm text-docket">No internal notes yet.</p>
               ) : (
-                <ol className="mt-5 space-y-3" aria-label="Case automation and activity timeline">
-                  {automationTimeline.map((entry) => (
-                    <li key={entry.id} className="relative pl-12">
-                      <TimelineIcon icon={entry.icon} tone={entry.tone} />
-                      <div className="rounded-md border border-ledger bg-paper p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge tone={entry.tone === "automation" ? "info" : entry.tone === "attorney" ? "success" : "neutral"}>
-                            {entry.actor}
-                          </Badge>
-                          <p className="break-words text-sm font-semibold text-ink">{entry.title}</p>
-                        </div>
-                        <p className="mt-2 break-words text-sm leading-6 text-docket">{entry.description}</p>
-                        <p className="mt-2 text-xs text-docket">{formatDate(entry.createdAt)}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                caseRecord.internalNotes.map((note) => (
+                  <div key={note.id} className="rounded-md border border-ledger bg-paper p-3 text-sm">
+                    <p className="break-words leading-6 text-ink">{note.body}</p>
+                    <p className="mt-2 text-xs text-docket">
+                      {note.author?.name ?? "Team member"} on {formatDate(note.createdAt)}
+                    </p>
+                  </div>
+                ))
               )}
-            </Card>
-          </div>
+            </div>
+            <form action={addInternalNoteAction} className="mt-5 space-y-3">
+              <input type="hidden" name="caseId" value={caseRecord.id} />
+              <label className="text-sm font-semibold text-ink" htmlFor="body">
+                Add note
+              </label>
+              <textarea
+                className="focus-ring min-h-28 w-full rounded-md border border-ledger bg-white px-3 py-2 text-sm"
+                id="body"
+                name="body"
+                minLength={3}
+                required
+              />
+              <Button tone="secondary" type="submit">
+                Save note
+              </Button>
+            </form>
+          </Card>
+
+          <AutomationTimelineCard automationTimeline={automationTimeline} />
         </div>
       </div>
     </div>
+  );
+}
+
+function AutomationTimelineCard({ automationTimeline }: { automationTimeline: AutomationTimelineEntry[] }) {
+  return (
+    <Card>
+      <div className="flex items-center gap-3">
+        <ClipboardCheck className="h-5 w-5 text-brief" aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-ink">Automation timeline</h2>
+          <p className="text-sm text-docket">Background rules and team actions in one audit trail.</p>
+        </div>
+      </div>
+      {automationTimeline.length === 0 ? (
+        <EmptyState
+          className="mt-5"
+          icon={Workflow}
+          title="No timeline activity yet"
+          description="Automation and team events will appear here as the case moves through intake and review."
+        />
+      ) : (
+        <div className="mt-5 overflow-x-auto pb-2" aria-label="Scrollable automation timeline">
+          <ol className="flex min-w-max gap-3" aria-label="Case automation and activity timeline">
+            {automationTimeline.map((entry, index) => (
+              <li key={entry.id} className="relative w-64 shrink-0">
+                {index < automationTimeline.length - 1 ? (
+                  <span className="absolute left-10 right-[-1rem] top-5 h-px bg-ledger" aria-hidden="true" />
+                ) : null}
+                <div className="relative flex flex-col gap-3">
+                  <TimelineIcon icon={entry.icon} tone={entry.tone} />
+                  <div className="rounded-md border border-ledger bg-paper p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={entry.tone === "automation" ? "info" : entry.tone === "attorney" ? "success" : "neutral"}>
+                        {entry.actor}
+                      </Badge>
+                      <p className="break-words text-sm font-semibold text-ink">{entry.title}</p>
+                    </div>
+                    <p className="mt-2 line-clamp-4 break-words text-sm leading-6 text-docket">{entry.description}</p>
+                    <p className="mt-2 text-xs text-docket">{formatDate(entry.createdAt)}</p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -451,10 +468,10 @@ function TimelineIcon({ icon, tone }: { icon: TimelineIconName; tone: TimelineTo
     <span
       className={
         tone === "automation"
-          ? "absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-brief"
+          ? "relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-brief shadow-hairline"
           : tone === "attorney"
-            ? "absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800"
-            : "absolute left-0 top-1 flex h-9 w-9 items-center justify-center rounded-full border border-ledger bg-white text-docket"
+            ? "relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-hairline"
+            : "relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-ledger bg-white text-docket shadow-hairline"
       }
     >
       <Icon className="h-4 w-4" aria-hidden="true" />

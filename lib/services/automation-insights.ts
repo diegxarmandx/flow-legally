@@ -8,14 +8,6 @@ import {
 } from "@/types/legalflow";
 import { isActiveCase, isPaymentBlocking, missingDocuments } from "@/lib/utils/status";
 
-const MINUTES_SAVED = {
-  documentReminder: 5,
-  paymentFollowUp: 7,
-  readinessRouting: 8,
-  summary: 5,
-  priorityTriage: 4
-} as const;
-
 export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): AutomationQueueData {
   const activeCases = cases.filter((caseRecord) => isActiveCase(caseRecord.status));
   const todayLogs = activeCases.flatMap((caseRecord) =>
@@ -47,7 +39,6 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       count: documentReminderCount,
       category: "document",
       timestampLabel: "Generated from today's activity logs",
-      minutesSaved: documentReminderCount * MINUTES_SAVED.documentReminder,
       status: "queued"
     },
     {
@@ -57,7 +48,6 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       count: paymentFollowUpCount,
       category: "payment",
       timestampLabel: "Scheduled from today's activity logs",
-      minutesSaved: paymentFollowUpCount * MINUTES_SAVED.paymentFollowUp,
       status: "queued"
     },
     {
@@ -67,7 +57,6 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       count: readyForReviewCount,
       category: "readiness",
       timestampLabel: "Updated today",
-      minutesSaved: readyForReviewCount * MINUTES_SAVED.readinessRouting,
       status: "completed"
     },
     {
@@ -77,7 +66,6 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       count: summaryCount,
       category: "summary",
       timestampLabel: "Generated today",
-      minutesSaved: summaryCount * MINUTES_SAVED.summary,
       status: "completed"
     },
     {
@@ -87,14 +75,13 @@ export function buildAutomationQueue(cases: CaseRecord[], today = new Date()): A
       count: highPriorityCount,
       category: "priority",
       timestampLabel: "Triaged today",
-      minutesSaved: highPriorityCount * MINUTES_SAVED.priorityTriage,
       status: "completed"
     }
   ]);
 
   return {
     items,
-    totalEstimatedMinutesSaved: items.reduce((total, item) => total + item.minutesSaved, 0),
+    totalActionCount: items.reduce((total, item) => total + item.count, 0),
     sourceDescription:
       "Generated from case readiness, missing documents, payment status, summaries, and follow-up rules."
   };

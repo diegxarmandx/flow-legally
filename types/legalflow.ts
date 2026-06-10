@@ -234,13 +234,12 @@ export type AutomationQueueItem = {
   count: number;
   category: AutomationQueueCategory;
   timestampLabel: string;
-  minutesSaved: number;
   status: "completed" | "queued" | "monitoring";
 };
 
 export type AutomationQueueData = {
   items: AutomationQueueItem[];
-  totalEstimatedMinutesSaved: number;
+  totalActionCount: number;
   sourceDescription: string;
 };
 

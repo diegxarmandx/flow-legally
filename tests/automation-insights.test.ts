@@ -126,7 +126,7 @@ describe("automation insights", () => {
     const queue = buildAutomationQueue([], today);
 
     expect(queue.items).toEqual([]);
-    expect(queue.totalEstimatedMinutesSaved).toBe(0);
+    expect(queue.totalActionCount).toBe(0);
   });
 
   it("builds queue items from document, payment, readiness, summary, and priority signals", () => {
@@ -161,7 +161,7 @@ describe("automation insights", () => {
       "summaries-generated",
       "priority-triage"
     ]);
-    expect(queue.totalEstimatedMinutesSaved).toBeGreaterThan(0);
+    expect(queue.totalActionCount).toBe(5);
   });
 
   it("counts only summaries generated on the requested day", () => {
@@ -198,6 +198,6 @@ describe("automation insights", () => {
     );
 
     expect(queue.items).toEqual([]);
-    expect(queue.totalEstimatedMinutesSaved).toBe(0);
+    expect(queue.totalActionCount).toBe(0);
   });
 });

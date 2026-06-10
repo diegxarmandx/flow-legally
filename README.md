@@ -13,7 +13,7 @@ Law firm intake teams often track case readiness across email, spreadsheets, not
 ## Core Features
 
 - Legal operations dashboard with active cases, incomplete intake, missing documents, pending payment, and ready-for-review metrics.
-- Today's Automation Queue showing generated document reminders, payment follow-ups, ready-for-review routing, AI summaries, priority triage, and estimated time saved.
+- Today's Automation Queue showing generated document reminders, payment follow-ups, ready-for-review routing, AI summaries, and priority triage.
 - Client list with search, case counts, last activity, and latest case status.
 - Professional intake form with Zod validation and case-type document checklists.
 - Case workspace with client info, review readiness, case summary, document requests, follow-up tasks, notes, and an automation-aware timeline.
@@ -52,7 +52,7 @@ The app uses server-rendered pages with Server Actions for mutations. UI compone
 Business logic stays out of React components:
 
 - `lib/services/case-status.ts` calculates readiness and status.
-- `lib/services/automation-insights.ts` derives Today's Automation Queue and estimated time saved from case, payment, document, summary, and follow-up data.
+- `lib/services/automation-insights.ts` derives Today's Automation Queue from case, payment, document, summary, and follow-up data.
 - `lib/services/automation-timeline.ts` maps activity logs into automation, team, and attorney timeline entries.
 - `lib/services/review-readiness.ts` builds the attorney handoff checklist and next best action.
 - `lib/services/follow-up-automation.ts` creates operational follow-up tasks.
@@ -82,7 +82,7 @@ The follow-up service creates:
 
 It checks existing open tasks by type to avoid duplicate active follow-ups for the same issue.
 
-The dashboard automation queue uses the same operational data to show what the platform handled today: generated document reminders, payment follow-ups, ready-for-review routing, summary generation, and priority triage. The estimated time saved is intentionally conservative and rule-based so the demo communicates automation value without pretending to run production background jobs.
+The dashboard automation queue uses the same operational data to show what the platform handled today: generated document reminders, payment follow-ups, ready-for-review routing, summary generation, and priority triage. It reports observed workflow actions rather than guessed savings.
 
 The case timeline classifies activity logs as automation, team, or attorney work. Automation-generated events include summary generation, document requests, follow-up creation, ready-for-review routing, and priority triage. Human events include notes, payment updates, received documents, completed follow-ups, and attorney review starts.
 

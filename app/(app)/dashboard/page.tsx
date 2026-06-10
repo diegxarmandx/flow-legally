@@ -100,11 +100,11 @@ export default async function DashboardPage() {
             <p className="mt-3 text-sm leading-6 text-docket">{data.automationQueue.sourceDescription}</p>
           </div>
           <div className="rounded-md border border-ledger bg-bone/70 px-4 py-3 lg:text-right">
-            <p className="text-xs font-semibold uppercase text-docket">Estimated time saved</p>
+            <p className="text-xs font-semibold uppercase text-docket">Automation actions</p>
             <p className="mt-1 text-2xl font-semibold text-walnut">
-              {data.automationQueue.totalEstimatedMinutesSaved} min
+              {data.automationQueue.totalActionCount}
             </p>
-            <p className="mt-1 text-xs text-docket">approximately today</p>
+            <p className="mt-1 text-xs text-docket">detected today</p>
           </div>
         </div>
 
@@ -231,7 +231,7 @@ function AutomationQueueRow({ item }: { item: AutomationQueueItem }) {
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-docket">
             <span className="rounded-md border border-ledger bg-white px-2 py-1">{item.timestampLabel}</span>
             <span className="rounded-md border border-ledger bg-white px-2 py-1">
-              {item.minutesSaved} min saved
+              {item.count} action{item.count === 1 ? "" : "s"}
             </span>
           </div>
         </div>

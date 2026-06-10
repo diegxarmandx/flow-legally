@@ -17,7 +17,7 @@ const sections = [
   {
     title: "Automation queue",
     icon: Workflow,
-    body: "Today's Automation Queue translates case, document, payment, summary, and follow-up signals into generated work and conservative time-saved estimates."
+    body: "Today's Automation Queue translates case, document, payment, summary, and follow-up signals into generated work and observable workflow actions."
   },
   {
     title: "Architecture",

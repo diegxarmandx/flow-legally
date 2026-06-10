@@ -23,8 +23,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family:
-    Aptos,
-    "Segoe UI",
+    var(--font-body),
     system-ui,
     sans-serif;
 }
@@ -47,11 +46,9 @@ a {
 
 .legal-heading {
   font-family:
-    "Iowan Old Style",
-    "Palatino Linotype",
-    Palatino,
-    Georgia,
+    var(--font-heading),
     serif;
+  letter-spacing: 0;
 }
 
 .focus-ring {
