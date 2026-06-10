@@ -71,7 +71,7 @@ a {
 
 @media print {
   @page {
-    margin: 0.55in;
+    margin: 0.38in;
   }
 
   html,
@@ -91,5 +91,91 @@ a {
 
   main {
     padding: 0 !important;
+  }
+
+  .packet-page {
+    font-size: 10px !important;
+    line-height: 1.28 !important;
+  }
+
+  .packet-page * {
+    box-shadow: none !important;
+  }
+
+  .packet-sheet {
+    color: #241812;
+  }
+
+  .packet-header {
+    padding-bottom: 0.14in !important;
+  }
+
+  .packet-title {
+    font-size: 22px !important;
+    line-height: 1.05 !important;
+  }
+
+  .packet-grid {
+    grid-template-columns: 0.82fr 1.18fr !important;
+    gap: 0.12in !important;
+    margin-top: 0.14in !important;
+    align-items: start !important;
+  }
+
+  .packet-column {
+    gap: 0.12in !important;
+  }
+
+  .packet-section {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border-radius: 0 !important;
+    padding: 0.1in !important;
+  }
+
+  .packet-section-title {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    margin-bottom: 0.07in !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+
+  .packet-highlight {
+    border-radius: 0 !important;
+    padding: 0.07in !important;
+  }
+
+  .packet-list-space {
+    gap: 0.05in !important;
+  }
+
+  .packet-list-space > * + * {
+    margin-top: 0.05in !important;
+  }
+
+  .packet-row {
+    padding-top: 0.055in !important;
+    padding-bottom: 0.055in !important;
+  }
+
+  .packet-list-item {
+    border-radius: 0 !important;
+    padding: 0.045in 0.06in !important;
+  }
+
+  .packet-activity-row {
+    padding-left: 0.08in !important;
+  }
+
+  .packet-page .inline-flex {
+    padding: 0.02in 0.05in !important;
+    font-size: 9px !important;
+    line-height: 1.15 !important;
+  }
+
+  .packet-page svg {
+    width: 0.12in !important;
+    height: 0.12in !important;
   }
 }
