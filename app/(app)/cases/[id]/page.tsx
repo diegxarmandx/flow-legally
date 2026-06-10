@@ -60,7 +60,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         title={`${caseRecord.client.name} case workspace`}
         description="A single operational surface for intake readiness, client follow-up, attorney review, and case context."
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
             <ButtonLink href={`/cases/${caseRecord.id}/packet`} tone="secondary">
               <FileText className="h-4 w-4" aria-hidden="true" />
               Preview packet
@@ -76,8 +76,8 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
-        <div className="space-y-5">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-5">
           <Card>
             <h2 className="text-base font-semibold text-ink">Client information</h2>
             <dl className="mt-5 space-y-3 text-sm">
@@ -146,7 +146,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
           <Card>
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-base font-semibold text-ink">Review readiness</h2>
                 <p className="mt-1 text-sm leading-6 text-docket">{reviewReadiness.handoffSummary}</p>
               </div>
@@ -220,18 +220,18 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
           </Card>
         </div>
 
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <Card>
             <div className="flex items-center gap-3">
               <ScrollText className="h-5 w-5 text-brief" aria-hidden="true" />
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-base font-semibold text-ink">Case summary</h2>
                 <p className="text-sm text-docket">Structured for attorney review.</p>
               </div>
             </div>
             {caseRecord.summary ? (
               <div className="mt-5 space-y-5 text-sm leading-6">
-                <p className="rounded-md border border-ledger bg-paper p-4 text-ink">
+                <p className="break-words rounded-md border border-ledger bg-paper p-4 text-ink">
                   {caseRecord.summary.situationSummary}
                 </p>
                 <SummaryList title="Key risks" items={caseRecord.summary.keyRisks} />
@@ -254,7 +254,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
           <Card>
             <div className="flex items-center justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-base font-semibold text-ink">Document requests</h2>
                 <p className="text-sm text-docket">{missing.length} request{missing.length === 1 ? "" : "s"} still blocking readiness.</p>
               </div>
@@ -263,11 +263,11 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
             <div className="mt-5 divide-y divide-ledger/70">
               {caseRecord.documentRequests.map((document) => (
                 <div key={document.id} className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-semibold text-ink">{document.title}</p>
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-ink">{document.title}</p>
                     <p className="mt-1 text-sm text-docket">{document.description}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
                     <StatusBadge value={document.status} />
                     {document.status !== DocumentStatus.RECEIVED ? (
                       <form action={markDocumentReceivedAction}>
@@ -287,7 +287,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
           <Card>
             <div className="flex items-center gap-3">
               <CalendarClock className="h-5 w-5 text-brief" aria-hidden="true" />
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-base font-semibold text-ink">Follow-up tasks</h2>
                 <p className="text-sm text-docket">Automation-generated work and manual reminders.</p>
               </div>
@@ -295,13 +295,13 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
             <div className="mt-5 divide-y divide-ledger/70">
               {caseRecord.followUpTasks.map((task) => (
                 <div key={task.id} className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-semibold text-ink">{task.title}</p>
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-ink">{task.title}</p>
                     <p className="mt-1 text-sm text-docket">
                       {labelFor(task.type)} due {formatRelativeDate(task.dueDate)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
                     <StatusBadge value={task.priority} />
                     <StatusBadge value={task.status} />
                     {task.status === FollowUpStatus.OPEN ? (
@@ -318,42 +318,42 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
                 </div>
               ))}
             </div>
-            <form action={createFollowUpAction} className="mt-5 grid gap-3 rounded-md border border-ledger bg-paper p-4 md:grid-cols-[1fr_160px_160px_140px_auto]">
+            <form action={createFollowUpAction} className="mt-5 grid min-w-0 gap-3 rounded-md border border-ledger bg-paper p-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_160px_160px_140px_auto]">
               <input type="hidden" name="caseId" value={caseRecord.id} />
               <label className="sr-only" htmlFor="title">
                 Follow-up title
               </label>
               <input
-                className="focus-ring min-h-10 rounded-md border border-ledger bg-white px-3 text-sm"
+                className="focus-ring min-h-10 min-w-0 rounded-md border border-ledger bg-white px-3 text-sm"
                 id="title"
                 name="title"
                 placeholder="Follow-up title"
                 minLength={3}
                 required
               />
-              <select className="focus-ring min-h-10 rounded-md border border-ledger bg-white px-3 text-sm" name="type" defaultValue={FollowUpType.GENERAL} aria-label="Follow-up type">
+              <select className="focus-ring min-h-10 min-w-0 rounded-md border border-ledger bg-white px-3 text-sm" name="type" defaultValue={FollowUpType.GENERAL} aria-label="Follow-up type">
                 {Object.values(FollowUpType).map((value) => (
                   <option key={value} value={value}>
                     {labelFor(value)}
                   </option>
                 ))}
               </select>
-              <input className="focus-ring min-h-10 rounded-md border border-ledger bg-white px-3 text-sm" name="dueDate" type="date" aria-label="Due date" required />
-              <select className="focus-ring min-h-10 rounded-md border border-ledger bg-white px-3 text-sm" name="priority" defaultValue={UrgencyLevel.STANDARD} aria-label="Priority">
+              <input className="focus-ring min-h-10 min-w-0 rounded-md border border-ledger bg-white px-3 text-sm" name="dueDate" type="date" aria-label="Due date" required />
+              <select className="focus-ring min-h-10 min-w-0 rounded-md border border-ledger bg-white px-3 text-sm" name="priority" defaultValue={UrgencyLevel.STANDARD} aria-label="Priority">
                 {Object.values(UrgencyLevel).map((value) => (
                   <option key={value} value={value}>
                     {labelFor(value)}
                   </option>
                 ))}
               </select>
-              <Button type="submit">
+              <Button className="lg:col-span-2 2xl:col-span-1" type="submit">
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Add
               </Button>
             </form>
           </Card>
 
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid min-w-0 gap-5 xl:grid-cols-2">
             <Card>
               <div className="flex items-center gap-3">
                 <MessageSquareText className="h-5 w-5 text-brief" aria-hidden="true" />
@@ -365,7 +365,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
                 ) : (
                   caseRecord.internalNotes.map((note) => (
                     <div key={note.id} className="rounded-md border border-ledger bg-paper p-3 text-sm">
-                      <p className="leading-6 text-ink">{note.body}</p>
+                      <p className="break-words leading-6 text-ink">{note.body}</p>
                       <p className="mt-2 text-xs text-docket">
                         {note.author?.name ?? "Team member"} on {formatDate(note.createdAt)}
                       </p>
@@ -394,7 +394,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
             <Card>
               <div className="flex items-center gap-3">
                 <ClipboardCheck className="h-5 w-5 text-brief" aria-hidden="true" />
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-base font-semibold text-ink">Automation timeline</h2>
                   <p className="text-sm text-docket">Background rules and team actions in one audit trail.</p>
                 </div>
@@ -416,7 +416,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
                           <Badge tone={entry.tone === "automation" ? "info" : entry.tone === "attorney" ? "success" : "neutral"}>
                             {entry.actor}
                           </Badge>
-                          <p className="text-sm font-semibold text-ink">{entry.title}</p>
+                          <p className="break-words text-sm font-semibold text-ink">{entry.title}</p>
                         </div>
                         <p className="mt-2 break-words text-sm leading-6 text-docket">{entry.description}</p>
                         <p className="mt-2 text-xs text-docket">{formatDate(entry.createdAt)}</p>
@@ -477,7 +477,7 @@ function SummaryList({ title, items }: { title: string; items: string[] }) {
       <p className="mb-2 text-xs font-semibold uppercase text-docket">{title}</p>
       <ul className="space-y-2">
         {items.map((item) => (
-          <li key={item} className="rounded-md border border-ledger/80 bg-white px-3 py-2 text-ink">
+          <li key={item} className="break-words rounded-md border border-ledger/80 bg-white px-3 py-2 text-ink">
             {item}
           </li>
         ))}
